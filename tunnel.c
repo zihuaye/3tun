@@ -62,6 +62,9 @@ int (*dev_read)(int fd, char *buf, int len);
 int (*proto_write)(int fd, char *buf, int len);
 int (*proto_read)(int fd, char *buf);
 
+int tcp_nodelay;
+int tcp_cork;
+
 /* Initialize and start the tunnel.
    Returns:
       -1 - critical error
@@ -124,8 +127,11 @@ int tunnel(struct vtun_host *host)
 	   opt=1;
 	   setsockopt(host->rmt_fd,SOL_SOCKET,SO_KEEPALIVE,&opt,sizeof(opt) );
 
-	   opt=1;
+	   opt=tcp_nodelay;  //set 1 to disable Nagle's algorithm, default 0
 	   setsockopt(host->rmt_fd,IPPROTO_TCP,TCP_NODELAY,&opt,sizeof(opt) );
+
+	   opt=tcp_cork;    //set 1 to enable TCP_CORK algorithm, default 0
+	   setsockopt(host->rmt_fd,IPPROTO_TCP,TCP_CORK,&opt,sizeof(opt) );
 
 	   proto_write = tcp_write;
 	   proto_read  = tcp_read;

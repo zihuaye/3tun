@@ -50,6 +50,9 @@ void usage(void);
 extern int optind,opterr,optopt;
 extern char *optarg;
 
+extern int tcp_nodelay;
+extern int tcp_cork;
+
 int main(int argc, char *argv[], char *env[])
 {
      int svr, daemon, sock, dofork, fd, opt;
@@ -89,8 +92,14 @@ int main(int argc, char *argv[], char *env[])
      /* Start logging to syslog and stderr */
      openlog("vtund", LOG_PID | LOG_NDELAY | LOG_PERROR, LOG_DAEMON);
 
-     while( (opt=getopt(argc,argv,"misf:P:L:t:np")) != EOF ){
+     while( (opt=getopt(argc,argv,"cdmisf:P:L:t:np")) != EOF ){
 	switch(opt){
+	    case 'c':
+		tcp_cork = 1;
+		tcp_nodelay = 0;
+	    case 'd':
+		tcp_nodelay = 1;
+		tcp_cork = 0;
 	    case 'm':
 	        if (mlockall(MCL_CURRENT | MCL_FUTURE) < 0) {
 		    perror("Unable to mlockall()");
