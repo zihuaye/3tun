@@ -92,7 +92,7 @@ int main(int argc, char *argv[], char *env[])
      /* Start logging to syslog and stderr */
      openlog("vtund", LOG_PID | LOG_NDELAY | LOG_PERROR, LOG_DAEMON);
 
-     while( (opt=getopt(argc,argv,"cdmisf:P:L:t:np")) != EOF ){
+     while( (opt=getopt(argc,argv,"hcdmisf:P:L:t:np")) != EOF ){
 	switch(opt){
 	    case 'c':
 		tcp_cork = 1;
@@ -129,6 +129,9 @@ int main(int argc, char *argv[], char *env[])
 	    case 't':
 	        vtun.timeout = atoi(optarg);	
 	        break;
+	    case 'h':
+		usage();
+	        exit(0);
 	    default:
 		usage();
 	        exit(1);
@@ -250,4 +253,5 @@ void usage(void)
      /* I don't think these work. I'm disabling the suggestion - bish 20050601*/
      printf("\tvtund [-f file] " /* [-P port] [-L local address] */
 	    "[-p] [-m] [-t timeout] <host profile> <server address>\n");
+     printf("  Common options:\n\t-c(tcp_cork) -d(tcp_nodelay)\n");
 }
