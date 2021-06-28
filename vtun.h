@@ -168,7 +168,7 @@ extern llist host_list;
 #define VTUN_FRAME_OVERHEAD 100
 #define VTUN_FSIZE_MASK 0x1fff
 
-#define VTUN_CONN_CLOSE 0x1000
+#define VTUN_CONN_CLOSE 0x3000
 #define VTUN_ECHO_REQ	0x2000
 #define VTUN_ECHO_REP	0x4000
 #define VTUN_BAD_FRAME  0x8000

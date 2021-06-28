@@ -53,6 +53,12 @@
 /* used by lfd_encrypt */
 int send_a_packet = 0;
 
+int merge_2 = 1;
+int merge_3 = 0;
+int log_merge = 1;
+
+int tv_us = 0;
+
 /* Host we are working with. 
  * Used by signal handlers that's why it is global. 
  */
@@ -201,13 +207,15 @@ int lfd_linker(void)
 {
      int fd1 = lfd_host->rmt_fd;
      int fd2 = lfd_host->loc_fd; 
-     register int len, fl;
-     struct timeval tv;
-     char *buf, *out;
-     fd_set fdset;
-     int maxfd, idle = 0, tmplen;
+     register int len, fl, len0, len2, len3;
+     struct timeval tv, tv2;
+     char *buf, *out, *pb, *pb2, *pb3;
+     fd_set fdset, fdset2;
+     int maxfd, idle = 0, tmplen, p;
+     unsigned short *pi;
+     struct iovec iov[3];
 
-     if( !(buf = lfd_alloc(VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)) ){
+     if( !(buf = lfd_alloc((VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)*2)) ){
 	vtun_syslog(LOG_ERR,"Can't allocate buffer for the linker"); 
         return 0; 
      }
@@ -281,36 +289,85 @@ int lfd_linker(void)
 	   fl = len & ~VTUN_FSIZE_MASK;
            len = len & VTUN_FSIZE_MASK;
 	   if( fl ){
-	      if( fl==VTUN_BAD_FRAME ){
-		 vtun_syslog(LOG_ERR, "Received bad frame");
-		 continue;
-	      }
-	      if( fl==VTUN_ECHO_REQ ){
-		 /* Send ECHO reply */
-	 	 if( proto_write(fd1, buf, VTUN_ECHO_REP) < 0 )
-		    break;
-		 continue;
-	      }
-   	      if( fl==VTUN_ECHO_REP ){
-		 /* Just ignore ECHO reply */
-		 continue;
-	      }
-	      if( fl==VTUN_CONN_CLOSE ){
-	         vtun_syslog(LOG_INFO,"Connection closed by other side");
-		 break;
-	      }
+	    	if( fl==VTUN_BAD_FRAME ){
+	 		vtun_syslog(LOG_ERR, "Received bad frame");
+	 		continue;
+	  	}
+	      	if( fl==VTUN_ECHO_REQ ){
+			/* Send ECHO reply */
+	 	 	if( proto_write(fd1, buf, VTUN_ECHO_REP) < 0 )
+		    		break;
+		 	continue;
+	      	}
+   	      	if( fl==VTUN_ECHO_REP ){
+			/* Just ignore ECHO reply */
+		 	continue;
+	      	}
+	      	if( fl==VTUN_CONN_CLOSE ){
+	         	vtun_syslog(LOG_INFO,"Connection closed by other side");
+		 	break;
+	      	}
 	   }   
 
 	   lfd_host->stat.comp_in += len; 
 	   if( (len=lfd_run_up(len,buf,&out)) == -1 )
-	      break;	
-	   if( len && dev_write(fd2,out,len) < 0 ){
-              if( errno != EAGAIN && errno != EINTR )
-                 break;
-              else
-                 continue;
-           }
-	   lfd_host->stat.byte_in += len; 
+	    	break;	
+
+	   /* new impovement code begin */
+
+	   pb = out + len - sizeof(short);
+	   pi = (unsigned short *)pb;
+
+	   len0 = len;  	//total pkt size
+	   len = ntohs(*pi); 	//first pkt size
+
+	   if (len > 0) {
+	      //2 or 3 pkts contained 
+	      pb = out;
+	      p = 0;
+
+	      while ( p < 3 ) {
+		p += 1;
+
+	   	if( len && dev_write(fd2,pb,len) < 0 ){
+              		if( errno != EAGAIN && errno != EINTR )
+                 		break;
+              		else
+                 		continue;
+           	}
+	   	lfd_host->stat.byte_in += len; 
+
+		/*
+		iov[p].iov_base = pb;
+		iov[p].iov_len = len;
+		*/
+
+		len0 -= len + sizeof(short);
+
+		if (len0 > 0) {
+			pb += len;
+			pi = (unsigned short *)pb;
+			len = ntohs(*pi);  	//next pkt's size 
+			pb += sizeof(short);
+		} else {
+			break;
+		}
+	      }
+
+	      //writev(fd2, iov, p);
+	   } else {
+		//only 1 packet
+	   	if( len0 && dev_write(fd2,out,len0-sizeof(short)) < 0 ){
+              		if( errno != EAGAIN && errno != EINTR )
+                 		break;
+              		else
+                 		continue;
+           	}
+	   	lfd_host->stat.byte_in += len0; 
+	   }
+
+	   /* new impovement code end */
+
 	}
 
 	/* Read data from the local device(fd2), encode and pass it to 
@@ -325,11 +382,142 @@ int lfd_linker(void)
 	   if( !len ) break;
 	
 	   lfd_host->stat.byte_out += len; 
+
+	   /* new impovement code begin */
+
+	   /* move buf pointer to next data area */
+	   pb  = buf + len;
+	   pi  = (unsigned short *)pb;
+	   *pi = htons(0);
+	   pb += sizeof(short);
+
+	   if ((len > 300)&&(len < VTUN_FRAME_SIZE/2)&&(merge_2 == 1)) {
+		/* pkt too small, try merge */
+        	FD_ZERO(&fdset2);
+		FD_SET(fd2, &fdset2);
+
+ 		tv2.tv_sec  = 0;
+		tv2.tv_usec = tv_us;
+
+		if ( select(fd2+1, &fdset2, NULL, NULL, &tv2) > 0 ) {
+
+			if(FD_ISSET(fd2, &fdset2)&&lfd_check_down())
+				len2 = dev_read(fd2, pb, VTUN_FRAME_SIZE);
+
+			if (log_merge > 0) {
+				vtun_syslog(LOG_INFO,"%s: 2 package merge active", lfd_host->host);
+				log_merge -= 1;
+			}
+
+			if ( len+len2 <= VTUN_FRAME_SIZE ) {
+				/* set true below to merge only 2 pkts not 3 */
+				if ((len+len2>=VTUN_FRAME_SIZE/2)||(merge_3 == 0)) {
+					/* merge 2 packets in one to send */
+					*pi = htons(len2);
+					pb += len2;
+					pi  = (unsigned short *)pb;
+					*pi = htons(len);
+
+					len=lfd_run_down(len+len2+2*sizeof(short),buf,&out);
+					proto_write(fd1, out, len);
+	   				lfd_host->stat.comp_out += len; 
+				} else {
+					/* buf not 50% full yet, try merge 3 packets 1 one to send */
+        				FD_ZERO(&fdset2);
+					FD_SET(fd2, &fdset2);
+
+ 					tv2.tv_sec  = 0;
+					tv2.tv_usec = tv_us;
+
+					if ( select(fd2+1, &fdset2, NULL, NULL, &tv2) > 0 ) {
+
+						*pi = htons(len2);
+						pb += len2;
+						pi  = (unsigned short *)pb;
+						*pi = htons(len);
+	   					pb += sizeof(short);
+
+						if(FD_ISSET(fd2, &fdset2)&&lfd_check_down())
+							len3 = dev_read(fd2, pb, VTUN_FRAME_SIZE);
+
+						if (log_merge > -1) {
+							vtun_syslog(LOG_INFO,"%s: 3 package merge active", lfd_host->host);
+							log_merge -= 1;
+						}
+
+						if ( len+len2+len3 <= VTUN_FRAME_SIZE ) {
+							//it's ok to merge 3 in 1
+							*pi = htons(len3);
+							pb += len3;
+							pi  = (unsigned short *)pb;
+							*pi = htons(len);
+	   						pb += sizeof(short);
+
+							len=lfd_run_down(len+len2+len3+3*sizeof(short),buf,&out);
+							proto_write(fd1, out, len);
+	   						lfd_host->stat.comp_out += len; 
+						} else {
+							//over frame size, send first 2, then last 1
+							len=lfd_run_down(len+len2+2*sizeof(short),buf,&out);
+							proto_write(fd1, out, len);
+	   						lfd_host->stat.comp_out += len; 
+
+							pb3 = pb + len3;
+							pi = (unsigned short *)pb3;
+							*pi = htons(0);
+
+							len3=lfd_run_down(len3+sizeof(short),pb,&out);
+							proto_write(fd1, out, len3);
+	   						lfd_host->stat.comp_out += len3; 
+						}
+					} else {
+						//only 2 pkts avalible
+						*pi = htons(len2);
+						pb += len2;
+						pi = (unsigned short *)pb;
+						*pi = htons(len);
+
+						len=lfd_run_down(len+len2+2*sizeof(short),buf,&out);
+						proto_write(fd1, out, len);
+	   					lfd_host->stat.comp_out += len; 
+					}
+				}
+			} else {
+				// pkt1+pkt2 size > VTUN_FRAME_SIZE, mtu overfull, send pkts one by one
+				len=lfd_run_down(len+sizeof(short),buf,&out);
+				proto_write(fd1, out, len);
+	   			lfd_host->stat.comp_out += len; 
+
+				pb2 = pb + len2;
+				pi  = (unsigned short *)pb2;
+				*pi = htons(0);
+
+				len2=lfd_run_down(len2+sizeof(short),pb,&out);
+				proto_write(fd1, out, len2);
+	   			lfd_host->stat.comp_out += len2; 
+			}
+		} else {
+			// no more pkt avalible
+			len=lfd_run_down(len+sizeof(short),buf,&out);
+			proto_write(fd1, out, len);
+	   		lfd_host->stat.comp_out += len; 
+		}
+	   } else {
+		// pkt size > VTUN_FRAME_SIZE/2, or too tiny, or merge mode off
+		len=lfd_run_down(len+sizeof(short),buf,&out);
+		proto_write(fd1, out, len);
+	   	lfd_host->stat.comp_out += len; 
+	   }
+
+	   /* new impovement code end */
+
+	   /*origin code here
 	   if( (len=lfd_run_down(len,buf,&out)) == -1 )
 	      break;
 	   if( len && proto_write(fd1, out, len) < 0 )
 	      break;
 	   lfd_host->stat.comp_out += len; 
+	   */
 	}
      }
      if( !linker_term && errno )

@@ -53,6 +53,10 @@ extern char *optarg;
 extern int tcp_nodelay;
 extern int tcp_cork;
 
+extern int tv_us;
+extern int merge_2;
+extern int merge_3;
+
 int main(int argc, char *argv[], char *env[])
 {
      int svr, daemon, sock, dofork, fd, opt;
@@ -92,14 +96,27 @@ int main(int argc, char *argv[], char *env[])
      /* Start logging to syslog and stderr */
      openlog("vtund", LOG_PID | LOG_NDELAY | LOG_PERROR, LOG_DAEMON);
 
-     while( (opt=getopt(argc,argv,"hcdmisf:P:L:t:np")) != EOF ){
+     while( (opt=getopt(argc,argv,"abu:hcdmisf:P:L:t:np")) != EOF ){
 	switch(opt){
+	    case 'a':
+		merge_2 = 0;
+		merge_3 = 0;
+		break;
+	    case 'b':
+		merge_2 = 1;
+		merge_3 = 1;
+		break;
+	    case 'u':
+		tv_us = atoi(optarg);
+		break;
 	    case 'c':
 		tcp_cork = 1;
 		tcp_nodelay = 0;
+		break;
 	    case 'd':
 		tcp_nodelay = 1;
 		tcp_cork = 0;
+		break;
 	    case 'm':
 	        if (mlockall(MCL_CURRENT | MCL_FUTURE) < 0) {
 		    perror("Unable to mlockall()");
@@ -253,5 +270,5 @@ void usage(void)
      /* I don't think these work. I'm disabling the suggestion - bish 20050601*/
      printf("\tvtund [-f file] " /* [-P port] [-L local address] */
 	    "[-p] [-m] [-t timeout] <host profile> <server address>\n");
-     printf("  Common options:\n\t-c(tcp_cork) -d(tcp_nodelay)\n");
+     printf("  Common options:\n\t-c(tcp_cork) -d(tcp_nodelay) -u(tv_usec) -a(1pkt mode) -b(3pkt mode)\n");
 }
