@@ -111,7 +111,11 @@ int lfd_free_mod(void)
 }
 
  /* Run modules down (from head to tail) */
+#if defined(__mips__)
+int lfd_run_down(int len, char *in, char **out)
+#else
 inline int lfd_run_down(int len, char *in, char **out)
+#endif
 {
      register struct lfd_mod *mod;
      
@@ -125,7 +129,11 @@ inline int lfd_run_down(int len, char *in, char **out)
 }
 
 /* Run modules up (from tail to head) */
+#if defined(__mips__)
+int lfd_run_up(int len, char *in, char **out)
+#else
 inline int lfd_run_up(int len, char *in, char **out)
+#endif
 {
      register struct lfd_mod *mod;
      
@@ -139,7 +147,11 @@ inline int lfd_run_up(int len, char *in, char **out)
 }
 
 /* Check if modules are accepting the data(down) */
+#if defined(__mips__)
+int lfd_check_down(void)
+#else
 inline int lfd_check_down(void)
+#endif
 {
      register struct lfd_mod *mod;
      int err = 1;
@@ -151,7 +163,11 @@ inline int lfd_check_down(void)
 }
 
 /* Check if modules are accepting the data(up) */
+#if defined(__mips__)
+int lfd_check_up(void)
+#else
 inline int lfd_check_up(void)
+#endif
 {
      register struct lfd_mod *mod;
      int err = 1;

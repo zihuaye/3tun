@@ -69,7 +69,11 @@ int shaper_counter(int len, char *in, char **out)
 }
 
 /* Convert tv struct to milisec */
+#if defined(__mips__)
+unsigned long tv2ms(struct timeval tv)
+#else
 unsigned long inline tv2ms(struct timeval tv)
+#endif
 {
      register unsigned long ms = (tv.tv_sec * 1000)+(tv.tv_usec / 1000); 
      return  ms ? ms : 1;
