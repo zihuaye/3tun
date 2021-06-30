@@ -229,7 +229,6 @@ int lfd_linker(void)
      fd_set fdset, fdset2;
      int maxfd, idle = 0, tmplen, p;
      unsigned short *pi;
-     struct iovec iov[3];
 
      if( !(buf = lfd_alloc((VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)*2)) ){
 	vtun_syslog(LOG_ERR,"Can't allocate buffer for the linker"); 
@@ -353,11 +352,6 @@ int lfd_linker(void)
            	}
 	   	lfd_host->stat.byte_in += len; 
 
-		/*
-		iov[p].iov_base = pb;
-		iov[p].iov_len = len;
-		*/
-
 		len0 -= len + sizeof(short);
 
 		if (len0 > 0) {
@@ -369,8 +363,6 @@ int lfd_linker(void)
 			break;
 		}
 	      }
-
-	      //writev(fd2, iov, p);
 	   } else {
 		//only 1 packet
 	   	if( len0 && dev_write(fd2,out,len0-sizeof(short)) < 0 ){
@@ -413,7 +405,7 @@ int lfd_linker(void)
 		FD_SET(fd2, &fdset2);
 
  		tv2.tv_sec  = 0;
-		tv2.tv_usec = tv_us;
+		tv2.tv_usec = tv_us;	// tv_us:0 means non-blocking select
 
 		if ( select(fd2+1, &fdset2, NULL, NULL, &tv2) > 0 ) {
 
@@ -426,7 +418,6 @@ int lfd_linker(void)
 			}
 
 			if ( len+len2 <= VTUN_FRAME_SIZE ) {
-				/* set true below to merge only 2 pkts not 3 */
 				if ((len+len2>=VTUN_FRAME_SIZE/2)||(merge_3 == 0)) {
 					/* merge 2 packets in one to send */
 					*pi = htons(len2);

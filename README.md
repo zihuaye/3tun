@@ -17,4 +17,3 @@ Base on vtun-3.0.2, has following enhancements:
 Todo:
 
 - legacy packet format compatible.
-- writev() sending multi pkts at one time.
