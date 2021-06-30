@@ -417,8 +417,8 @@ int lfd_linker(void)
 				log_merge -= 1;
 			}
 
-			if ( len+len2 <= VTUN_FRAME_SIZE ) {
-				if ((len+len2>=VTUN_FRAME_SIZE/2)||(merge_3 == 0)) {
+			if ( len+len2 < VTUN_FRAME_SIZE - VTUN_FRAME_OVERHEAD ) {
+				if ((len+len2 >= VTUN_FRAME_SIZE/2)||(merge_3 == 0)) {
 					/* merge 2 packets in one to send */
 					*pi = htons(len2);
 					pb += len2;
@@ -452,7 +452,7 @@ int lfd_linker(void)
 							log_merge -= 1;
 						}
 
-						if ( len+len2+len3 <= VTUN_FRAME_SIZE ) {
+						if ( len+len2+len3 < VTUN_FRAME_SIZE - VTUN_FRAME_OVERHEAD ) {
 							//it's ok to merge 3 in 1
 							*pi = htons(len3);
 							pb += len3;
@@ -490,7 +490,7 @@ int lfd_linker(void)
 					}
 				}
 			} else {
-				// pkt1+pkt2 size > VTUN_FRAME_SIZE, mtu overfull, send pkts one by one
+				// pkt1+pkt2 size >= VTUN_FRAME_SIZE-VTUN_FRAME_OVERHEAD, send pkts one by one
 				len=lfd_run_down(len+sizeof(short),buf,&out);
 				proto_write(fd1, out, len);
 	   			lfd_host->stat.comp_out += len; 
@@ -510,7 +510,7 @@ int lfd_linker(void)
 	   		lfd_host->stat.comp_out += len; 
 		}
 	   } else {
-		// pkt size > VTUN_FRAME_SIZE/2, or too tiny, or merge mode off
+		// pkt size >= VTUN_FRAME_SIZE/2, or too tiny, or merge_2 off, send it at once
 		len=lfd_run_down(len+sizeof(short),buf,&out);
 		proto_write(fd1, out, len);
 	   	lfd_host->stat.comp_out += len; 
