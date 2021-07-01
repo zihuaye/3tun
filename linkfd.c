@@ -57,6 +57,7 @@ int merge_2 = 1;
 int merge_3 = 0;
 int log_merge = 1;
 
+int legacy_tunnel = 1;
 int tv_us = 0;
 
 /* Host we are working with. 
@@ -235,7 +236,7 @@ int lfd_linker(void)
         return 0; 
      }
 
-     proto_write(fd1, buf, VTUN_ECHO_REQ);
+     proto_write(fd1, buf, VTUN_ECHO_REQ+1); //+1: it's a new format tunnel, legacy tunnel will not recognize it
 
      maxfd = (fd1 > fd2 ? fd1 : fd2) + 1;
 
@@ -312,6 +313,8 @@ int lfd_linker(void)
 			/* Send ECHO reply */
 	 	 	if( proto_write(fd1, buf, VTUN_ECHO_REP) < 0 )
 		    		break;
+			if (len > 0)
+				legacy_tunnel = 0; //recieving VTUN_ECHO_REQ > 0x2000, peer tunnel format is a new one
 		 	continue;
 	      	}
    	      	if( fl==VTUN_ECHO_REP ){
@@ -328,23 +331,11 @@ int lfd_linker(void)
 	   if( (len=lfd_run_up(len,buf,&out)) == -1 )
 	    	break;	
 
-	   /* new impovement code begin */
+	   if (legacy_tunnel) {
 
-	   pb = out + len - sizeof(short);
-	   pi = (unsigned short *)pb;
+		/* old format tunnel */
 
-	   len0 = len;  	//total pkt size
-	   len = ntohs(*pi); 	//first pkt size
-
-	   if (len > 0) {
-	      //2 or 3 pkts contained 
-	      pb = out;
-	      p = 0;
-
-	      while ( p < 3 ) {
-		p += 1;
-
-	   	if( len && dev_write(fd2,pb,len) < 0 ){
+	   	if( len && dev_write(fd2,out,len) < 0 ){
               		if( errno != EAGAIN && errno != EINTR )
                  		break;
               		else
@@ -352,30 +343,56 @@ int lfd_linker(void)
            	}
 	   	lfd_host->stat.byte_in += len; 
 
-		len0 -= len + sizeof(short);
-
-		if (len0 > 0) {
-			pb += len;
-			pi = (unsigned short *)pb;
-			len = ntohs(*pi);  	//next pkt's size 
-			pb += sizeof(short);
-		} else {
-			break;
-		}
-	      }
 	   } else {
-		//only 1 packet
-	   	if( len0 && dev_write(fd2,out,len0-sizeof(short)) < 0 ){
-              		if( errno != EAGAIN && errno != EINTR )
-                 		break;
-              		else
-                 		continue;
-           	}
-	   	lfd_host->stat.byte_in += len0; 
+
+	   	/* new impovement tunnle code begin */
+
+	   	pb = out + len - sizeof(short);
+	   	pi = (unsigned short *)pb;
+
+	   	len0 = len;  		//total pkt size
+	   	len = ntohs(*pi); 	//first pkt size
+
+	   	if (len > 0) {
+	      		//2 or 3 pkts contained 
+	      		pb = out;
+	      		p = 0;
+
+	      		while ( p < 3 ) {
+				p += 1;
+
+	   			if( len && dev_write(fd2,pb,len) < 0 ){
+              				if( errno != EAGAIN && errno != EINTR )
+                 				break;
+              				else
+                 				continue;
+           			}
+	   			lfd_host->stat.byte_in += len; 
+
+				len0 -= len + sizeof(short);
+
+				if (len0 > 0) {
+					pb += len;
+					pi = (unsigned short *)pb;
+					len = ntohs(*pi);  	//next pkt's size 
+					pb += sizeof(short);
+				} else {
+					break;
+				}
+	      		}
+	   	} else {
+			//only 1 packet
+	   		if( len0 && dev_write(fd2,out,len0-sizeof(short)) < 0 ){
+              			if( errno != EAGAIN && errno != EINTR )
+                 			break;
+              			else
+                 			continue;
+           		}
+	   		lfd_host->stat.byte_in += len0; 
+	   	}
+
+	   	/* new impovement tunnel code end */
 	   }
-
-	   /* new impovement code end */
-
 	}
 
 	/* Read data from the local device(fd2), encode and pass it to 
@@ -391,7 +408,18 @@ int lfd_linker(void)
 	
 	   lfd_host->stat.byte_out += len; 
 
-	   /* new impovement code begin */
+	   if (legacy_tunnel) {
+		/* old format tunnel code */
+
+	   	if( (len=lfd_run_down(len,buf,&out)) == -1 )
+	      		break;
+	   	if( len && proto_write(fd1, out, len) < 0 )
+	      		break;
+	   	lfd_host->stat.comp_out += len; 
+		continue;
+	   }
+
+	   /* new impovement tunnel code begin */
 
 	   /* move buf pointer to next data area */
 	   pb  = buf + len;
@@ -516,15 +544,8 @@ int lfd_linker(void)
 	   	lfd_host->stat.comp_out += len; 
 	   }
 
-	   /* new impovement code end */
+	   /* new impovement tunnel code end */
 
-	   /*origin code here
-	   if( (len=lfd_run_down(len,buf,&out)) == -1 )
-	      break;
-	   if( len && proto_write(fd1, out, len) < 0 )
-	      break;
-	   lfd_host->stat.comp_out += len; 
-	   */
 	}
      }
      if( !linker_term && errno )

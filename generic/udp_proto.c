@@ -56,6 +56,8 @@
 #include "vtun.h"
 #include "lib.h"
 
+extern int legacy_tunnel;
+
 /* Functions to read/write UDP frames. */
 int udp_write(int fd, char *buf, int len)
 {
@@ -64,8 +66,20 @@ int udp_write(int fd, char *buf, int len)
 
      ptr = buf - sizeof(short);
 
+     if (legacy_tunnel) {
+        if (len == VTUN_CONN_CLOSE) {
+                len = 0x1000;
+        }
+     }
+
      *((unsigned short *)ptr) = htons(len); 
-     len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
+
+     if (legacy_tunnel) {
+     	len  = (len & 0x0fff) + sizeof(short);
+     } else {
+     	len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
+     }
+
 
      while( 1 ){
 	if( (wlen = write(fd, ptr, len)) < 0 ){ 
@@ -101,6 +115,11 @@ int udp_read(int fd, char *buf)
      	      return rlen;
 	}
         hdr = ntohs(hdr);
+     	if (legacy_tunnel) {
+        	if (hdr == 0x1000) {
+                	hdr = VTUN_CONN_CLOSE;
+        	}
+     	}
         flen = hdr & VTUN_FSIZE_MASK;
 
         if( rlen < 2 || (rlen-2) != flen )

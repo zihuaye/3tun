@@ -54,14 +54,27 @@
 #include "vtun.h"
 #include "lib.h"
 
+extern int legacy_tunnel;
+
 int tcp_write(int fd, char *buf, int len)
 {
      register char *ptr;
 
      ptr = buf - sizeof(short);
 
+     if (legacy_tunnel) {
+	if (len == VTUN_CONN_CLOSE) {
+		len = 0x1000;
+	}
+     }
+
      *((unsigned short *)ptr) = htons(len); 
-     len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
+
+     if (legacy_tunnel) {
+     	len  = (len & 0x0fff) + sizeof(short);
+     } else {
+     	len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
+     }
 
      return write_n(fd, ptr, len);
 }
@@ -76,6 +89,11 @@ int tcp_read(int fd, char *buf)
 	return rlen;
 
      len = ntohs(len);
+     if (legacy_tunnel) {
+	if (len == 0x1000) {
+		len = VTUN_CONN_CLOSE;
+	}
+     }
      flen = len & VTUN_FSIZE_MASK;
 
      if( flen > VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD ){
