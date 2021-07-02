@@ -113,10 +113,6 @@ int tcp_read(int fd, char *buf)
 
      if( len & ~VTUN_FSIZE_MASK ){
 	/* Return flags & clean data buffer */
-	if ( flen > 0 ) {
-		 /* a legacy tunnel not doing this, tcp_write() must not sending any data with flag frame*/
-		 read_n(fd, buf, flen);
-	}
 	return len;
      }
 
