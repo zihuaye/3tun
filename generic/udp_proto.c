@@ -75,7 +75,11 @@ int udp_write(int fd, char *buf, int len)
      *((unsigned short *)ptr) = htons(len); 
 
      if (legacy_tunnel) {
-     	len  = (len & 0x0fff) + sizeof(short);
+	if (len >= VTUN_ECHO_REQ) {
+     		len  = sizeof(short);
+     	} else {
+     		len  = (len & 0x0fff) + sizeof(short);
+	}
      } else {
      	len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
      }
@@ -127,4 +131,4 @@ int udp_read(int fd, char *buf)
 
 	return hdr;
      }
-}		
+}
