@@ -71,7 +71,11 @@ int tcp_write(int fd, char *buf, int len)
      *((unsigned short *)ptr) = htons(len); 
 
      if (legacy_tunnel) {
-     	len  = (len & 0x0fff) + sizeof(short);
+	if (len >= VTUN_ECHO_REQ) {
+     		len  = sizeof(short);
+	} else {
+     		len  = (len & 0x0fff) + sizeof(short);
+	}
      } else {
      	len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
      }
@@ -108,8 +112,9 @@ int tcp_read(int fd, char *buf)
      }	
 
      if( len & ~VTUN_FSIZE_MASK ){
-	/* Return flags */
+	/* Return flags & clean data buffer */
 	if ( flen > 0 ) {
+		 /* a legacy tunnel not doing this, tcp_write() must not sending any data with flag frame*/
 		 read_n(fd, buf, flen);
 	}
 	return len;
