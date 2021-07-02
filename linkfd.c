@@ -237,7 +237,7 @@ int lfd_linker(void)
      }
 
      proto_write(fd1, buf, VTUN_ECHO_REQ+1); //+1: it's a new format tunnel, legacy tunnel will not recognize it
-     vtun_syslog(LOG_INFO, "%s: handshaking, %d", lfd_host->host, VTUN_ECHO_REQ+1);
+     //vtun_syslog(LOG_INFO, "%s: handshaking, %d", lfd_host->host, VTUN_ECHO_REQ+1);
 
      maxfd = (fd1 > fd2 ? fd1 : fd2) + 1;
 
@@ -314,10 +314,10 @@ int lfd_linker(void)
 			/* Send ECHO reply */
 	 	 	if( proto_write(fd1, buf, VTUN_ECHO_REP) < 0 )
 		    		break;
-			if (len > 0)
+			if (len > 0) {
 				/* recieving VTUN_ECHO_REQ > 0x2000, peer tunnel format is a new one */
 				legacy_tunnel = 0;
-	 			vtun_syslog(LOG_INFO, "%s: Peer is new tunnel format", lfd_host->host);
+			}
 		 	continue;
 	      	}
    	      	if( fl==VTUN_ECHO_REP ){
