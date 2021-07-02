@@ -316,6 +316,7 @@ int lfd_linker(void)
 			if (len > 0) {
 				/* recieving VTUN_ECHO_REQ > 0x2000, peer tunnel format is a new one */
 				legacy_tunnel = 0;
+	         		vtun_syslog(LOG_INFO,"%s: Peer has a new tunnel format", lfd_host->host);
 			}
 		 	continue;
 	      	}
