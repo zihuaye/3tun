@@ -158,23 +158,24 @@ extern llist host_list;
 #define VTUN_LEGACY_ENCRYPT	999
 
 /* Mask to drop the flags which will be supplied by the server */
-#define VTUN_CLNT_MASK  0xf000
+#define VTUN_CLNT_MASK  	0xf000
 
-#define VTUN_STAT	0x1000
-#define VTUN_PERSIST    0x2000
+#define VTUN_STAT		0x1000
+#define VTUN_PERSIST    	0x2000
 
 /* Constants and flags for VTun protocol */
-#define VTUN_FRAME_SIZE     8091
-#define VTUN_FRAME_OVERHEAD 100
-#define VTUN_FSIZE_MASK 0x1fff
+#define VTUN_FRAME_SIZE     	8091
+#define VTUN_FRAME_OVERHEAD 	100
+#define VTUN_FSIZE_MASK 	0x1fff
 
-#define VTUN_CONN_CLOSE 0x6000
-#define VTUN_ECHO_REQ	0x2000
-#define VTUN_ECHO_REP	0x4000
-#define VTUN_BAD_FRAME  0x8000
+#define VTUN_ECHO_REQ		0x2000
+#define VTUN_ECHO_REQ2		0x2001
+#define VTUN_ECHO_REP		0x4000
+#define VTUN_CONN_CLOSE 	0x6000
+#define VTUN_BAD_FRAME  	0x8000
 
 /* Authentication message size */
-#define VTUN_MESG_SIZE	50
+#define VTUN_MESG_SIZE		50
 
 /* Support for multiple connections */
 #define VTUN_MULTI_DENY		0  /* no */ 
@@ -186,8 +187,8 @@ extern llist host_list;
 
 /* Values for the signal flag */
 
-#define VTUN_SIG_TERM 1
-#define VTUN_SIG_HUP  2
+#define VTUN_SIG_TERM 		1
+#define VTUN_SIG_HUP  		2
 
 /* Global options */
 struct vtun_opts {

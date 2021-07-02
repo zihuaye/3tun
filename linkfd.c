@@ -236,7 +236,10 @@ int lfd_linker(void)
         return 0; 
      }
 
-     proto_write(fd1, buf, VTUN_ECHO_REQ + 1); //+1: new format tunnel, legacy tunnel will not recognize it
+     /* VTUN_ECHO_REQ2: new format tunnel,
+ 	legacy tunnel will just recognize it as VTUN_ECHO_REQ */
+
+     proto_write(fd1, buf, VTUN_ECHO_REQ2);
 
      maxfd = (fd1 > fd2 ? fd1 : fd2) + 1;
 
