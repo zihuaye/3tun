@@ -80,6 +80,8 @@ int tcp_write(int fd, char *buf, int len)
      	len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
      }
 
+     //vtun_syslog(LOG_INFO,"tcp_write: (%d)%d,%d", legacy_tunnel, ntohs(*((unsigned short *)ptr)), len);
+
      return write_n(fd, ptr, len);
 }
 
@@ -110,6 +112,8 @@ int tcp_read(int fd, char *buf)
         }                                                               
 	return VTUN_BAD_FRAME;
      }	
+
+     //vtun_syslog(LOG_INFO,"tcp_read: (%d)%d,%d", legacy_tunnel, len, flen);
 
      if( len & ~VTUN_FSIZE_MASK ){
 	/* Return flags & clean data buffer */
