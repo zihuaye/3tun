@@ -109,6 +109,9 @@ int tcp_read(int fd, char *buf)
 
      if( len & ~VTUN_FSIZE_MASK ){
 	/* Return flags */
+	if ( flen > 0 ) {
+		 read_n(fd, buf, flen);
+	}
 	return len;
      }
 
