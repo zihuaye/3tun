@@ -310,14 +310,14 @@ int lfd_linker(void)
 	 		continue;
 	  	}
 	      	if( fl==VTUN_ECHO_REQ ){
-			/* Send ECHO reply */
-	 	 	if( proto_write(fd1, buf, VTUN_ECHO_REP) < 0 )
-		    		break;
 			if (len > 0) {
 				/* recieving VTUN_ECHO_REQ > 0x2000, peer tunnel format is a new one */
 				legacy_tunnel = 0;
 	         		vtun_syslog(LOG_INFO,"%s: Peer has a new tunnel format", lfd_host->host);
 			}
+			/* Send ECHO reply */
+	 	 	if( proto_write(fd1, buf, VTUN_ECHO_REP) < 0 )
+		    		break;
 		 	continue;
 	      	}
    	      	if( fl==VTUN_ECHO_REP ){
