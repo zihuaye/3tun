@@ -12,8 +12,4 @@ Base on vtun-3.0.2, has following enhancements:
 - GCC cross compile arm/mips/x86_64 compatible.
   
   (`#if defined(__mips__) ...  #endif`) (`__arm__ __x86_64__`)
-- More coming...
-
-Todo:
-
-- legacy packet format compatible.
+- Legacy packet format(vtun-3.0.2) compatible.
