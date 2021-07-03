@@ -164,10 +164,13 @@ extern llist host_list;
 #define VTUN_PERSIST    	0x2000
 
 /* Constants and flags for VTun protocol */
+#define VTUN_FRAME_SIZE0     	2048
 #define VTUN_FRAME_SIZE     	8091
 #define VTUN_FRAME_OVERHEAD 	100
+#define VTUN_FSIZE_MASK0 	0x0fff
 #define VTUN_FSIZE_MASK 	0x1fff
 
+#define VTUN_CONN_CLOSE0 	0x1000
 #define VTUN_ECHO_REQ		0x2000
 #define VTUN_ECHO_REQ2		0x2001
 #define VTUN_ECHO_REP		0x4000

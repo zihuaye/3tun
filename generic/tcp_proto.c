@@ -64,7 +64,7 @@ int tcp_write(int fd, char *buf, int len)
 
      if (legacy_tunnel) {
 	if (len == VTUN_CONN_CLOSE) {
-		len = 0x1000;
+		len = VTUN_CONN_CLOSE0;
 	}
      }
 
@@ -74,7 +74,7 @@ int tcp_write(int fd, char *buf, int len)
 	if (len >= VTUN_ECHO_REQ) {
      		len  = sizeof(short);
 	} else {
-     		len  = (len & 0x0fff) + sizeof(short);
+     		len  = (len & VTUN_FSIZE_MASK0) + sizeof(short);
 	}
      } else {
      	len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
@@ -96,7 +96,7 @@ int tcp_read(int fd, char *buf)
 
      len = ntohs(len);
      if (legacy_tunnel) {
-	if (len == 0x1000) {
+	if (len == VTUN_CONN_CLOSE0) {
 		len = VTUN_CONN_CLOSE;
 	}
      }
