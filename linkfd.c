@@ -236,9 +236,11 @@ int lfd_linker(void)
         return 0; 
      }
 
+     /* reset tunnel mode */
+     legacy_tunnel = 1;
+
      /* VTUN_ECHO_REQ2: new format tunnel,
  	legacy tunnel will just recognize it as VTUN_ECHO_REQ */
-
      proto_write(fd1, buf, VTUN_ECHO_REQ2);
 
      maxfd = (fd1 > fd2 ? fd1 : fd2) + 1;
@@ -461,9 +463,7 @@ int lfd_linker(void)
 					pi  = (unsigned short *)pb;
 					*pi = htons(len);
 
-					len=lfd_run_down(len+len2+2*sizeof(short),buf,&out);
-					proto_write(fd1, out, len);
-	   				lfd_host->stat.comp_out += len; 
+					send_n(fd1, buf, out, len+len2+2*sizeof(short));
 				} else {
 					/* buf not 50% full yet, try merge 3 packets 1 one to send */
         				FD_ZERO(&fdset2);
@@ -497,22 +497,16 @@ int lfd_linker(void)
 							*pi = htons(len);
 	   						pb += sizeof(short);
 
-							len=lfd_run_down(len+len2+len3+3*sizeof(short),buf,&out);
-							proto_write(fd1, out, len);
-	   						lfd_host->stat.comp_out += len; 
+							send_n(fd1, buf, out, len+len2+len3+3*sizeof(short));
 						} else {
 							//over frame size, send first 2, then last 1
-							len=lfd_run_down(len+len2+2*sizeof(short),buf,&out);
-							proto_write(fd1, out, len);
-	   						lfd_host->stat.comp_out += len; 
+							send_n(fd1, buf, out, len+len2+2*sizeof(short));
 
 							pb3 = pb + len3;
 							pi = (unsigned short *)pb3;
 							*pi = htons(0);
 
-							len3=lfd_run_down(len3+sizeof(short),pb,&out);
-							proto_write(fd1, out, len3);
-	   						lfd_host->stat.comp_out += len3; 
+							send_n(fd1, pb, out, len3+sizeof(short));
 						}
 					} else {
 						//only 2 pkts avalible
@@ -521,36 +515,26 @@ int lfd_linker(void)
 						pi = (unsigned short *)pb;
 						*pi = htons(len);
 
-						len=lfd_run_down(len+len2+2*sizeof(short),buf,&out);
-						proto_write(fd1, out, len);
-	   					lfd_host->stat.comp_out += len; 
+						send_n(fd1, buf, out, len+len2+2*sizeof(short));
 					}
 				}
 			} else {
 				// pkt1+pkt2 size >= VTUN_FRAME_SIZE-VTUN_FRAME_OVERHEAD, send pkts one by one
-				len=lfd_run_down(len+sizeof(short),buf,&out);
-				proto_write(fd1, out, len);
-	   			lfd_host->stat.comp_out += len; 
+				send_n(fd1, buf, out, len+sizeof(short));
 
 				pb2 = pb + len2;
 				pi  = (unsigned short *)pb2;
 				*pi = htons(0);
 
-				len2=lfd_run_down(len2+sizeof(short),pb,&out);
-				proto_write(fd1, out, len2);
-	   			lfd_host->stat.comp_out += len2; 
+				send_n(fd1, pb, out, len2+sizeof(short));
 			}
 		} else {
 			// no more pkt avalible
-			len=lfd_run_down(len+sizeof(short),buf,&out);
-			proto_write(fd1, out, len);
-	   		lfd_host->stat.comp_out += len; 
+			send_n(fd1, buf, out, len+sizeof(short));
 		}
 	   } else {
 		// pkt size >= VTUN_FRAME_SIZE/2, or too tiny, or merge_2 off, send it at once
-		len=lfd_run_down(len+sizeof(short),buf,&out);
-		proto_write(fd1, out, len);
-	   	lfd_host->stat.comp_out += len; 
+		send_n(fd1, buf, out, len+sizeof(short));
 	   }
 
 	   /* new impovement tunnel code end */
@@ -569,6 +553,21 @@ int lfd_linker(void)
      lfd_free(buf);
 
      return 0;
+}
+
+#if defined(__mips__)
+int send_n(int fd, char *in, char *out, int n)
+#else
+inline int send_n(int fd, char *in, char *out, int n)
+#endif
+{
+     int len = 0;
+
+     if ((len = lfd_run_down(n, in, &out)) > 0)
+     	if ((len = proto_write(fd, out, len)) > 0)
+     		lfd_host->stat.comp_out += len;
+
+     return len;
 }
 
 /* Link remote and local file descriptors */ 
