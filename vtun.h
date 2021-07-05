@@ -170,6 +170,8 @@ extern llist host_list;
 #define VTUN_FSIZE_MASK0 	0x0fff
 #define VTUN_FSIZE_MASK 	0x1fff
 
+#define VTUN_PACKET_TINY_SIZE 	200
+
 #define VTUN_CONN_CLOSE0 	0x1000
 #define VTUN_ECHO_REQ		0x2000
 #define VTUN_ECHO_REQ2		0x2001

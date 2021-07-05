@@ -239,6 +239,8 @@ int lfd_linker(void)
      /* reset tunnel mode */
      legacy_tunnel = 1;
 
+     log_merge = 1;
+
      /* VTUN_ECHO_REQ2: new format tunnel,
  	legacy tunnel will just recognize it as VTUN_ECHO_REQ */
      proto_write(fd1, buf, VTUN_ECHO_REQ2);
@@ -416,11 +418,10 @@ int lfd_linker(void)
 	   }
 	   if( !len ) break;
 	
-	   lfd_host->stat.byte_out += len; 
-
 	   if (legacy_tunnel) {
 		/* old format tunnel code */
 
+	   	lfd_host->stat.byte_out += len; 
 	   	if( (len=lfd_run_down(len,buf,&out)) == -1 )
 	      		break;
 	   	if( len && proto_write(fd1, out, len) < 0 )
@@ -437,7 +438,7 @@ int lfd_linker(void)
 	   *pi = htons(0);
 	   pb += sizeof(short);
 
-	   if ((len > 300)&&(len < VTUN_FRAME_SIZE/2)&&(merge_2 == 1)) {
+	   if ((len > VTUN_PACKET_TINY_SIZE)&&(len < VTUN_FRAME_SIZE/2)&&(merge_2 == 1)) {
 		/* pkt too small, try merge */
         	FD_ZERO(&fdset2);
 		FD_SET(fd2, &fdset2);
@@ -562,6 +563,8 @@ inline int send_n(int fd, char *in, char *out, int n)
 #endif
 {
      int len = 0;
+
+     lfd_host->stat.byte_out += n; 
 
      if ((len = lfd_run_down(n, in, &out)) > 0)
      	if ((len = proto_write(fd, out, len)) > 0)
