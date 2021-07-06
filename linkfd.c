@@ -411,10 +411,10 @@ int lfd_linker(void)
          * the network (fd1) */
 	if( FD_ISSET(fd2, &fdset) && lfd_check_down() ){
 	   if( (len = dev_read(fd2, buf, VTUN_FRAME_SIZE)) < 0 ){
-	      if( errno != EAGAIN && errno != EINTR )
-	         break;
-	      else
-		 continue;
+	   	if( errno != EAGAIN && errno != EINTR )
+	       		break;
+	      	else
+	 		continue;
 	   }
 	   if( !len ) break;
 	
