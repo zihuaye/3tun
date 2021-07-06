@@ -77,7 +77,11 @@ int tcp_write(int fd, char *buf, int len)
      		len  = (len & VTUN_FSIZE_MASK0) + sizeof(short);
 	}
      } else {
-     	len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
+	if (len >= VTUN_ECHO_REQ) {
+     		len  = sizeof(short);
+	} else {
+     		len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
+	}
      }
 
      //vtun_syslog(LOG_INFO,"tcp_write: (%d)%d,%d", legacy_tunnel, ntohs(*((unsigned short *)ptr)), len);
