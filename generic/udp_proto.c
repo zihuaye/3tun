@@ -68,7 +68,7 @@ int udp_write(int fd, char *buf, int len)
 
      if (legacy_tunnel) {
         if (len == VTUN_CONN_CLOSE) {
-                len = 0x1000;
+                len = VTUN_CONN_CLOSE0;
         }
      }
 
@@ -78,10 +78,14 @@ int udp_write(int fd, char *buf, int len)
 	if (len >= VTUN_ECHO_REQ) {
      		len  = sizeof(short);
      	} else {
-     		len  = (len & 0x0fff) + sizeof(short);
+     		len  = (len & VTUN_FSIZE_MASK0) + sizeof(short);
 	}
      } else {
-     	len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
+	if (len >= VTUN_ECHO_REQ) {
+     		len  = sizeof(short);
+     	} else {
+     		len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
+	}
      }
 
 
@@ -120,7 +124,7 @@ int udp_read(int fd, char *buf)
 	}
         hdr = ntohs(hdr);
      	if (legacy_tunnel) {
-        	if (hdr == 0x1000) {
+        	if (hdr == VTUN_CONN_CLOSE0) {
                 	hdr = VTUN_CONN_CLOSE;
         	}
      	}
