@@ -55,7 +55,6 @@ int send_a_packet = 0;
 
 int merge_2 = 1;
 int merge_3 = 0;
-int log_merge = 1;
 
 int legacy_tunnel = 1;
 int tv_us = 0;
@@ -228,7 +227,7 @@ int lfd_linker(void)
      struct timeval tv, tv2;
      char *buf, *out, *pb, *pb2, *pb3;
      fd_set fdset, fdset2;
-     int maxfd, idle = 0, tmplen, p;
+     int maxfd, idle = 0, tmplen, p, log_merge = 1, log_tunnel = 1;
      unsigned short *pi;
 
      if( !(buf = lfd_alloc((VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)*2)) ){
@@ -239,7 +238,7 @@ int lfd_linker(void)
      /* reset tunnel mode */
      legacy_tunnel = 1;
 
-     log_merge = 1;
+     tv_us = 0;
 
      /* VTUN_ECHO_REQ2: new format tunnel,
  	legacy tunnel will just recognize it as VTUN_ECHO_REQ */
@@ -295,7 +294,7 @@ int lfd_linker(void)
 		 break;	
 	      }
 	      /* Send ECHO request */
-	      if( proto_write(fd1, buf, VTUN_ECHO_REQ) < 0 )
+	      if( proto_write(fd1, buf, VTUN_ECHO_REQ2) < 0 )
 		 break;
 	   }
 	   continue;
@@ -320,8 +319,11 @@ int lfd_linker(void)
 			if (len > 0) {
 				/* recieved VTUN_ECHO_REQ2, peer tunnel format is a new one */
 				legacy_tunnel = 0;
-
-	         		vtun_syslog(LOG_INFO,"%s: Peer has a new tunnel format", lfd_host->host);
+				if (log_tunnel) {
+	         			vtun_syslog(LOG_INFO,"%s: Peer has a new tunnel format",
+							lfd_host->host);
+					log_tunnel -= 1;
+				}
 			}
 
 			/* Send ECHO reply */
