@@ -381,7 +381,7 @@ int lfd_linker(void)
               				else
                  				continue;
            			}
-	   			lfd_host->stat.byte_in += len; 
+				lfd_host->stat.byte_in += len; 
 
 				len0 -= len + sizeof(short);
 
