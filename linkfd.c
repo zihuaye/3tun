@@ -228,7 +228,7 @@ int lfd_linker(void)
      char *buf, *out, *pb, *pb2, *pb3;
      fd_set fdset, fdset2;
      int maxfd, idle = 0, tmplen, p, log_merge = 1, log_tunnel = 1;
-     unsigned short *pi;
+     unsigned short *pi, mask;
 
      if( !(buf = lfd_alloc((VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)*2)) ){
 	vtun_syslog(LOG_ERR,"Can't allocate buffer for the linker"); 
@@ -307,9 +307,11 @@ int lfd_linker(void)
 	   if( (len=proto_read(fd1, buf)) <= 0 )
 	      break;
 
+	   mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
+
 	   /* Handle frame flags */
-	   fl = len & ~VTUN_FSIZE_MASK;
-           len = len & VTUN_FSIZE_MASK;
+	   fl = len & ~mask;
+           len = len & mask;
 	   if( fl ){
 	    	if( fl==VTUN_BAD_FRAME ){
 	 		vtun_syslog(LOG_ERR, "Received bad frame");
@@ -335,7 +337,7 @@ int lfd_linker(void)
 			/* Just ignore ECHO reply */
 		 	continue;
 	      	}
-	      	if( fl==VTUN_CONN_CLOSE ){
+	      	if( (fl==VTUN_CONN_CLOSE)||(fl==VTUN_CONN_CLOSE0) ){
 	         	vtun_syslog(LOG_INFO,"Connection closed by other side");
 		 	break;
 	      	}
@@ -552,7 +554,11 @@ int lfd_linker(void)
      }
 
      /* Notify other end about our close */
-     proto_write(fd1, buf, VTUN_CONN_CLOSE);
+     if (legacy_tunnel)
+     	proto_write(fd1, buf, VTUN_CONN_CLOSE0);
+     else
+     	proto_write(fd1, buf, VTUN_CONN_CLOSE);
+
      lfd_free(buf);
 
      return 0;
