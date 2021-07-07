@@ -120,7 +120,7 @@ int tcp_read(int fd, char *buf)
      //vtun_syslog(LOG_INFO,"tcp_read: (%d)%d,%d", legacy_tunnel, len, flen);
 
      if( len & ~VTUN_FSIZE_MASK ){
-	/* Return flags & clean data buffer */
+	/* Return flags */
 	return len;
      }
 
