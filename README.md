@@ -10,7 +10,7 @@ Base on vtun-3.0.2, has following improvement:
 - `TCP_CORK` mode support.
   
   (default:`TCP_CORK=0`)
-- Packet merge mode, can merge 2 or 3 pkt in one crypting frame. It can improve performance of tunnels with hw crypto devices that perform better in large frame encrypt/decrypting. 
+- Packet merge mode, can merge 2 or 3 pkt in one crypting frame. It can improve performance of tunnels with hw crypto devices that perform better in large frame encrypt/decrypting(like: MT7621 SoC). 
 
   As you know, regular packet size is about 100 - 1500 bytes.
 
