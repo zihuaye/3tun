@@ -63,16 +63,16 @@ int udp_write(int fd, char *buf, int len)
 {
      register char *ptr;
      register int wlen;
-     unsigned short mask;
+     unsigned short mask, plen;
 
      ptr = buf - sizeof(short);
      *((unsigned short *)ptr) = htons(len); 
 
      mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
-     len = (len >= VTUN_ECHO_REQ ? sizeof(short) : (len & mask) + sizeof(short));
+     plen = (len >= VTUN_ECHO_REQ ? sizeof(short) : (len & mask) + sizeof(short));
 
      while( 1 ){
-	if( (wlen = write(fd, ptr, len)) < 0 ){ 
+	if( (wlen = write(fd, ptr, plen)) < 0 ){ 
 	   if( errno == EAGAIN || errno == EINTR )
 	      continue;
 	   if( errno == ENOBUFS )
@@ -104,8 +104,8 @@ int udp_read(int fd, char *buf)
 	   else
      	      return rlen;
 	}
-        hdr = ntohs(hdr);
 
+        hdr = ntohs(hdr);
      	mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
      	flen = (hdr >= VTUN_ECHO_REQ ? 0 : hdr & mask);
 

@@ -235,13 +235,13 @@ int lfd_linker(void)
         return 0; 
      }
 
+     tv_us = 0;
+
      /* reset tunnel mode */
      legacy_tunnel = 1;
      mask = VTUN_FSIZE_MASK0;
 
-     tv_us = 0;
-
-     /* VTUN_ECHO_REQ2: new format tunnel,
+     /* VTUN_ECHO_REQ2: identify self as a new format tunnel,
  	legacy tunnel will just recognize it as VTUN_ECHO_REQ */
      proto_write(fd1, buf, VTUN_ECHO_REQ2);
 
@@ -350,7 +350,7 @@ int lfd_linker(void)
 
 	   if (legacy_tunnel) {
 
-		/* old format tunnel */
+		/* old format tunnel code */
 
 	   	if( len && dev_write(fd2,out,len) < 0 ){
               		if( errno != EAGAIN && errno != EINTR )
@@ -391,14 +391,14 @@ int lfd_linker(void)
 				if (len0 > 0) {
 					pb += len;
 					pi = (unsigned short *)pb;
-					len = ntohs(*pi);  	//next pkt's size 
+					len = ntohs(*pi);  		//next pkt size 
 					pb += sizeof(short);
 				} else {
 					break;
 				}
 	      		}
 	   	} else {
-			//only 1 packet
+			//only 1 pkt
 	   		if( len0 && dev_write(fd2,out,len0-sizeof(short)) < 0 ){
               			if( errno != EAGAIN && errno != EINTR )
                  			break;
@@ -424,6 +424,7 @@ int lfd_linker(void)
 	   if( !len ) break;
 	
 	   if (legacy_tunnel) {
+
 		/* old format tunnel code */
 
 	   	lfd_host->stat.byte_out += len; 
@@ -437,7 +438,7 @@ int lfd_linker(void)
 
 	   /* new impovement tunnel code begin */
 
-	   /* move buf pointer to next data area */
+	   /* move buffer pointer to next data area */
 	   pb  = buf + len;
 	   pi  = (unsigned short *)pb;
 	   *pi = htons(0);
@@ -571,7 +572,6 @@ inline int send_n(int fd, char *in, char *out, int n)
      int len = 0;
 
      lfd_host->stat.byte_out += n; 
-
      if ((len = lfd_run_down(n, in, &out)) > 0)
      	if ((len = proto_write(fd, out, len)) > 0)
      		lfd_host->stat.comp_out += len;

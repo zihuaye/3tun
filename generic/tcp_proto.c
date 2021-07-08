@@ -59,15 +59,15 @@ extern int legacy_tunnel;
 int tcp_write(int fd, char *buf, int len)
 {
      register char *ptr;
-     unsigned short mask;
+     unsigned short mask, plen;
 
      ptr = buf - sizeof(short);
      *((unsigned short *)ptr) = htons(len); 
 
      mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
-     len = (len >= VTUN_ECHO_REQ ? sizeof(short) : (len & mask) + sizeof(short));
+     plen = (len >= VTUN_ECHO_REQ ? sizeof(short) : (len & mask) + sizeof(short));
 
-     return write_n(fd, ptr, len);
+     return write_n(fd, ptr, plen);
 }
 
 int tcp_read(int fd, char *buf)
