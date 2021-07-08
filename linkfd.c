@@ -237,6 +237,7 @@ int lfd_linker(void)
 
      /* reset tunnel mode */
      legacy_tunnel = 1;
+     mask = VTUN_FSIZE_MASK0;
 
      tv_us = 0;
 
@@ -307,8 +308,6 @@ int lfd_linker(void)
 	   if( (len=proto_read(fd1, buf)) <= 0 )
 	      break;
 
-	   mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
-
 	   /* Handle frame flags */
 	   fl = len & ~mask;
            len = len & mask;
@@ -321,6 +320,8 @@ int lfd_linker(void)
 			if (len > 0) {
 				/* recieved VTUN_ECHO_REQ2, peer tunnel format is a new one */
 				legacy_tunnel = 0;
+	   			mask = VTUN_FSIZE_MASK;
+
 				if (log_tunnel) {
 	         			vtun_syslog(LOG_INFO,"%s: Peer has a new tunnel format",
 							lfd_host->host);
@@ -554,10 +555,7 @@ int lfd_linker(void)
      }
 
      /* Notify other end about our close */
-     if (legacy_tunnel)
-     	proto_write(fd1, buf, VTUN_CONN_CLOSE0);
-     else
-     	proto_write(fd1, buf, VTUN_CONN_CLOSE);
+     proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
 
      lfd_free(buf);
 
