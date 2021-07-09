@@ -59,35 +59,20 @@ extern int legacy_tunnel;
 int tcp_write(int fd, char *buf, int len)
 {
      register char *ptr;
+     unsigned short mask, plen;
 
      ptr = buf - sizeof(short);
-
-     if (legacy_tunnel) {
-	if (len == VTUN_CONN_CLOSE) {
-		len = VTUN_CONN_CLOSE0;
-	}
-     }
-
      *((unsigned short *)ptr) = htons(len); 
 
-     if (legacy_tunnel) {
-	if (len >= VTUN_ECHO_REQ) {
-     		len  = sizeof(short);
-	} else {
-     		len  = (len & VTUN_FSIZE_MASK0) + sizeof(short);
-	}
-     } else {
-     	len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
-     }
+     mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
+     plen = (len >= VTUN_ECHO_REQ ? sizeof(short) : (len & mask) + sizeof(short));
 
-     //vtun_syslog(LOG_INFO,"tcp_write: (%d)%d,%d", legacy_tunnel, ntohs(*((unsigned short *)ptr)), len);
-
-     return write_n(fd, ptr, len);
+     return write_n(fd, ptr, plen);
 }
 
 int tcp_read(int fd, char *buf)
 {
-     unsigned short len, flen;
+     unsigned short len, flen, mask;
      register int rlen;     
 
      /* Read frame size */
@@ -95,12 +80,8 @@ int tcp_read(int fd, char *buf)
 	return rlen;
 
      len = ntohs(len);
-     if (legacy_tunnel) {
-	if (len == VTUN_CONN_CLOSE0) {
-		len = VTUN_CONN_CLOSE;
-	}
-     }
-     flen = len & VTUN_FSIZE_MASK;
+     mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
+     flen = (len >= VTUN_ECHO_REQ ? 0 : len & mask);
 
      if( flen > VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD ){
      	/* Oversized frame, drop it. */ 
@@ -113,10 +94,8 @@ int tcp_read(int fd, char *buf)
 	return VTUN_BAD_FRAME;
      }	
 
-     //vtun_syslog(LOG_INFO,"tcp_read: (%d)%d,%d", legacy_tunnel, len, flen);
-
-     if( len & ~VTUN_FSIZE_MASK ){
-	/* Return flags & clean data buffer */
+     if( len & ~mask ){
+	/* Return flags, without data */
 	return len;
      }
 

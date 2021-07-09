@@ -55,7 +55,6 @@ int send_a_packet = 0;
 
 int merge_2 = 1;
 int merge_3 = 0;
-int log_merge = 1;
 
 int legacy_tunnel = 1;
 int tv_us = 0;
@@ -228,17 +227,22 @@ int lfd_linker(void)
      struct timeval tv, tv2;
      char *buf, *out, *pb, *pb2, *pb3;
      fd_set fdset, fdset2;
-     int maxfd, idle = 0, tmplen, p;
-     unsigned short *pi;
+     int maxfd, idle = 0, tmplen, p, log_merge = 1, log_tunnel = 1;
+     unsigned short *pi, mask;
 
      if( !(buf = lfd_alloc((VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)*2)) ){
 	vtun_syslog(LOG_ERR,"Can't allocate buffer for the linker"); 
         return 0; 
      }
 
-     /* VTUN_ECHO_REQ2: new format tunnel,
- 	legacy tunnel will just recognize it as VTUN_ECHO_REQ */
+     tv_us = 0;
 
+     /* reset tunnel mode */
+     legacy_tunnel = 1;
+     mask = VTUN_FSIZE_MASK0;
+
+     /* VTUN_ECHO_REQ2: identify self as a new format tunnel,
+ 	legacy tunnel will just recognize it as VTUN_ECHO_REQ */
      proto_write(fd1, buf, VTUN_ECHO_REQ2);
 
      maxfd = (fd1 > fd2 ? fd1 : fd2) + 1;
@@ -291,7 +295,7 @@ int lfd_linker(void)
 		 break;	
 	      }
 	      /* Send ECHO request */
-	      if( proto_write(fd1, buf, VTUN_ECHO_REQ) < 0 )
+	      if( proto_write(fd1, buf, VTUN_ECHO_REQ2) < 0 )
 		 break;
 	   }
 	   continue;
@@ -305,8 +309,8 @@ int lfd_linker(void)
 	      break;
 
 	   /* Handle frame flags */
-	   fl = len & ~VTUN_FSIZE_MASK;
-           len = len & VTUN_FSIZE_MASK;
+	   fl = len & ~mask;
+           len = len & mask;
 	   if( fl ){
 	    	if( fl==VTUN_BAD_FRAME ){
 	 		vtun_syslog(LOG_ERR, "Received bad frame");
@@ -316,8 +320,13 @@ int lfd_linker(void)
 			if (len > 0) {
 				/* recieved VTUN_ECHO_REQ2, peer tunnel format is a new one */
 				legacy_tunnel = 0;
+	   			mask = VTUN_FSIZE_MASK;
 
-	         		vtun_syslog(LOG_INFO,"%s: Peer has a new tunnel format", lfd_host->host);
+				if (log_tunnel) {
+	         			vtun_syslog(LOG_INFO,"%s: Peer has a new tunnel format",
+							lfd_host->host);
+					log_tunnel -= 1;
+				}
 			}
 
 			/* Send ECHO reply */
@@ -329,7 +338,7 @@ int lfd_linker(void)
 			/* Just ignore ECHO reply */
 		 	continue;
 	      	}
-	      	if( fl==VTUN_CONN_CLOSE ){
+	      	if( (fl==VTUN_CONN_CLOSE)||(fl==VTUN_CONN_CLOSE0) ){
 	         	vtun_syslog(LOG_INFO,"Connection closed by other side");
 		 	break;
 	      	}
@@ -341,7 +350,7 @@ int lfd_linker(void)
 
 	   if (legacy_tunnel) {
 
-		/* old format tunnel */
+		/* old format tunnel code */
 
 	   	if( len && dev_write(fd2,out,len) < 0 ){
               		if( errno != EAGAIN && errno != EINTR )
@@ -375,21 +384,21 @@ int lfd_linker(void)
               				else
                  				continue;
            			}
-	   			lfd_host->stat.byte_in += len; 
+				lfd_host->stat.byte_in += len; 
 
 				len0 -= len + sizeof(short);
 
 				if (len0 > 0) {
 					pb += len;
 					pi = (unsigned short *)pb;
-					len = ntohs(*pi);  	//next pkt's size 
+					len = ntohs(*pi);  		//next pkt size 
 					pb += sizeof(short);
 				} else {
 					break;
 				}
 	      		}
 	   	} else {
-			//only 1 packet
+			//only 1 pkt
 	   		if( len0 && dev_write(fd2,out,len0-sizeof(short)) < 0 ){
               			if( errno != EAGAIN && errno != EINTR )
                  			break;
@@ -407,18 +416,18 @@ int lfd_linker(void)
          * the network (fd1) */
 	if( FD_ISSET(fd2, &fdset) && lfd_check_down() ){
 	   if( (len = dev_read(fd2, buf, VTUN_FRAME_SIZE)) < 0 ){
-	      if( errno != EAGAIN && errno != EINTR )
-	         break;
-	      else
-		 continue;
+	   	if( errno != EAGAIN && errno != EINTR )
+	       		break;
+	      	else
+	 		continue;
 	   }
 	   if( !len ) break;
 	
-	   lfd_host->stat.byte_out += len; 
-
 	   if (legacy_tunnel) {
+
 		/* old format tunnel code */
 
+	   	lfd_host->stat.byte_out += len; 
 	   	if( (len=lfd_run_down(len,buf,&out)) == -1 )
 	      		break;
 	   	if( len && proto_write(fd1, out, len) < 0 )
@@ -429,13 +438,13 @@ int lfd_linker(void)
 
 	   /* new impovement tunnel code begin */
 
-	   /* move buf pointer to next data area */
+	   /* move buffer pointer to next data area */
 	   pb  = buf + len;
 	   pi  = (unsigned short *)pb;
 	   *pi = htons(0);
 	   pb += sizeof(short);
 
-	   if ((len > 300)&&(len < VTUN_FRAME_SIZE/2)&&(merge_2 == 1)) {
+	   if ((len > VTUN_PACKET_TINY_SIZE)&&(len < VTUN_FRAME_SIZE/2)&&(merge_2 == 1)) {
 		/* pkt too small, try merge */
         	FD_ZERO(&fdset2);
 		FD_SET(fd2, &fdset2);
@@ -461,9 +470,7 @@ int lfd_linker(void)
 					pi  = (unsigned short *)pb;
 					*pi = htons(len);
 
-					len=lfd_run_down(len+len2+2*sizeof(short),buf,&out);
-					proto_write(fd1, out, len);
-	   				lfd_host->stat.comp_out += len; 
+					send_n(fd1, buf, out, len+len2+2*sizeof(short));
 				} else {
 					/* buf not 50% full yet, try merge 3 packets 1 one to send */
         				FD_ZERO(&fdset2);
@@ -497,22 +504,16 @@ int lfd_linker(void)
 							*pi = htons(len);
 	   						pb += sizeof(short);
 
-							len=lfd_run_down(len+len2+len3+3*sizeof(short),buf,&out);
-							proto_write(fd1, out, len);
-	   						lfd_host->stat.comp_out += len; 
+							send_n(fd1, buf, out, len+len2+len3+3*sizeof(short));
 						} else {
 							//over frame size, send first 2, then last 1
-							len=lfd_run_down(len+len2+2*sizeof(short),buf,&out);
-							proto_write(fd1, out, len);
-	   						lfd_host->stat.comp_out += len; 
+							send_n(fd1, buf, out, len+len2+2*sizeof(short));
 
 							pb3 = pb + len3;
 							pi = (unsigned short *)pb3;
 							*pi = htons(0);
 
-							len3=lfd_run_down(len3+sizeof(short),pb,&out);
-							proto_write(fd1, out, len3);
-	   						lfd_host->stat.comp_out += len3; 
+							send_n(fd1, pb, out, len3+sizeof(short));
 						}
 					} else {
 						//only 2 pkts avalible
@@ -521,36 +522,26 @@ int lfd_linker(void)
 						pi = (unsigned short *)pb;
 						*pi = htons(len);
 
-						len=lfd_run_down(len+len2+2*sizeof(short),buf,&out);
-						proto_write(fd1, out, len);
-	   					lfd_host->stat.comp_out += len; 
+						send_n(fd1, buf, out, len+len2+2*sizeof(short));
 					}
 				}
 			} else {
 				// pkt1+pkt2 size >= VTUN_FRAME_SIZE-VTUN_FRAME_OVERHEAD, send pkts one by one
-				len=lfd_run_down(len+sizeof(short),buf,&out);
-				proto_write(fd1, out, len);
-	   			lfd_host->stat.comp_out += len; 
+				send_n(fd1, buf, out, len+sizeof(short));
 
 				pb2 = pb + len2;
 				pi  = (unsigned short *)pb2;
 				*pi = htons(0);
 
-				len2=lfd_run_down(len2+sizeof(short),pb,&out);
-				proto_write(fd1, out, len2);
-	   			lfd_host->stat.comp_out += len2; 
+				send_n(fd1, pb, out, len2+sizeof(short));
 			}
 		} else {
 			// no more pkt avalible
-			len=lfd_run_down(len+sizeof(short),buf,&out);
-			proto_write(fd1, out, len);
-	   		lfd_host->stat.comp_out += len; 
+			send_n(fd1, buf, out, len+sizeof(short));
 		}
 	   } else {
 		// pkt size >= VTUN_FRAME_SIZE/2, or too tiny, or merge_2 off, send it at once
-		len=lfd_run_down(len+sizeof(short),buf,&out);
-		proto_write(fd1, out, len);
-	   	lfd_host->stat.comp_out += len; 
+		send_n(fd1, buf, out, len+sizeof(short));
 	   }
 
 	   /* new impovement tunnel code end */
@@ -565,10 +556,27 @@ int lfd_linker(void)
      }
 
      /* Notify other end about our close */
-     proto_write(fd1, buf, VTUN_CONN_CLOSE);
+     proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+
      lfd_free(buf);
 
      return 0;
+}
+
+#if defined(__mips__)
+int send_n(int fd, char *in, char *out, int n)
+#else
+inline int send_n(int fd, char *in, char *out, int n)
+#endif
+{
+     int len = 0;
+
+     lfd_host->stat.byte_out += n; 
+     if ((len = lfd_run_down(n, in, &out)) > 0)
+     	if ((len = proto_write(fd, out, len)) > 0)
+     		lfd_host->stat.comp_out += len;
+
+     return len;
 }
 
 /* Link remote and local file descriptors */ 

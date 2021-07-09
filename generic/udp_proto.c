@@ -63,30 +63,16 @@ int udp_write(int fd, char *buf, int len)
 {
      register char *ptr;
      register int wlen;
+     unsigned short mask, plen;
 
      ptr = buf - sizeof(short);
-
-     if (legacy_tunnel) {
-        if (len == VTUN_CONN_CLOSE) {
-                len = 0x1000;
-        }
-     }
-
      *((unsigned short *)ptr) = htons(len); 
 
-     if (legacy_tunnel) {
-	if (len >= VTUN_ECHO_REQ) {
-     		len  = sizeof(short);
-     	} else {
-     		len  = (len & 0x0fff) + sizeof(short);
-	}
-     } else {
-     	len  = (len & VTUN_FSIZE_MASK) + sizeof(short);
-     }
-
+     mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
+     plen = (len >= VTUN_ECHO_REQ ? sizeof(short) : (len & mask) + sizeof(short));
 
      while( 1 ){
-	if( (wlen = write(fd, ptr, len)) < 0 ){ 
+	if( (wlen = write(fd, ptr, plen)) < 0 ){ 
 	   if( errno == EAGAIN || errno == EINTR )
 	      continue;
 	   if( errno == ENOBUFS )
@@ -101,7 +87,7 @@ int udp_write(int fd, char *buf, int len)
 
 int udp_read(int fd, char *buf)
 {
-     unsigned short hdr, flen;
+     unsigned short hdr, flen, mask;
      struct iovec iv[2];
      register int rlen;
 
@@ -118,13 +104,10 @@ int udp_read(int fd, char *buf)
 	   else
      	      return rlen;
 	}
+
         hdr = ntohs(hdr);
-     	if (legacy_tunnel) {
-        	if (hdr == 0x1000) {
-                	hdr = VTUN_CONN_CLOSE;
-        	}
-     	}
-        flen = hdr & VTUN_FSIZE_MASK;
+     	mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
+     	flen = (hdr >= VTUN_ECHO_REQ ? 0 : hdr & mask);
 
         if( rlen < 2 || (rlen-2) != flen )
 	   return VTUN_BAD_FRAME;
