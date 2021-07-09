@@ -21,3 +21,4 @@ Base on vtun-3.0.2, has following improvement:
   
   (`#if defined(__mips__) ...  #endif`) (`__arm__ __x86_64__`)
 - Legacy packet format(vtun-3.0.2) compatible. The tunnel peers having new/old version can talk to determine the right working mode.
+- OpenSSL 1.1 and crypto engine support.(via patch)
