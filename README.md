@@ -8,15 +8,13 @@ Base on vtun-3.0.2, has following improvement:
 
   As you know, regular packet size is about 100 - 1500 bytes.
 
-  (default: merge 2)
-  
-  (option -a: off; option -b: merge 3)
+  (default: merge 2) (option -a: off; option -b: merge 3)
 - `TCP_CORK` mode support.
   
-  (default:`TCP_CORK=0`)(option -c: on)
+  (default:`TCP_CORK=0`) (option -c: on)
 - `TCP_NODELAY`(negative Nagle's Algorithm) configurable.
   
-  (default:`TCP_NODELAY=0`)(option -d: on)
+  (default:`TCP_NODELAY=0`) (option -d: on)
 - GCC cross compile `arm/mips/x86_64` compatible.
   
   (`#if defined(__mips__) ...  #endif`) (`__arm__ __x86_64__`)
