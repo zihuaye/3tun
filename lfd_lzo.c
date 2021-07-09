@@ -103,7 +103,8 @@ int free_lzo()
  */  
 int comp_lzo(int len, char *in, char **out)
 { 
-     unsigned int zlen = 0;    
+     //unsigned int zlen = 0;    
+     lzo_uint zlen = 0;    //remove compile warning
      int err;
      
      if( (err=lzo1x_compress((void *)in,len,zbuf,&zlen,wmem)) != LZO_E_OK ){
@@ -117,7 +118,8 @@ int comp_lzo(int len, char *in, char **out)
 
 int decomp_lzo(int len, char *in, char **out)
 {
-     unsigned int zlen = 0;
+     //unsigned int zlen = 0;
+     lzo_uint zlen = 0;    //remove compile warning
      int err;
 
      if( (err=lzo1x_decompress((void *)in,len,zbuf,&zlen,wmem)) != LZO_E_OK ){
