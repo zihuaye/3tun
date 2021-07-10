@@ -56,6 +56,8 @@ extern int tcp_cork;
 extern int merge_2;
 extern int merge_3;
 
+extern int force_legacy;
+
 int main(int argc, char *argv[], char *env[])
 {
      int svr, daemon, sock, dofork, fd, opt;
@@ -95,7 +97,7 @@ int main(int argc, char *argv[], char *env[])
      /* Start logging to syslog and stderr */
      openlog("vtund", LOG_PID | LOG_NDELAY | LOG_PERROR, LOG_DAEMON);
 
-     while( (opt=getopt(argc,argv,"abcdmisf:P:L:t:npvh")) != EOF ){
+     while( (opt=getopt(argc,argv,"abcdlmisf:P:L:t:npvh")) != EOF ){
 	switch(opt){
 	    case 'a':
 		merge_2 = 0;
@@ -112,6 +114,9 @@ int main(int argc, char *argv[], char *env[])
 	    case 'd':
 		tcp_nodelay = 1;
 		tcp_cork = 0;
+		break;
+	    case 'l':
+		force_legacy = 1;
 		break;
 	    case 'm':
 	        if (mlockall(MCL_CURRENT | MCL_FUTURE) < 0) {
@@ -269,5 +274,5 @@ void usage(void)
      /* I don't think these work. I'm disabling the suggestion - bish 20050601*/
      printf("\tvtund [-f file] " /* [-P port] [-L local address] */
 	    "[-p] [-m] [-t timeout] <host profile> <server address>\n");
-     printf("  Extra options:\n\t-a(1pkt mode) -b(3pkt mode) -c(tcp_cork) -d(tcp_nodelay)\n");
+     printf("  Extra options:\n\t-a(1pkt mode) -b(3pkt mode) -c(tcp_cork) -d(tcp_nodelay) -l(force_legacy)\n");
 }

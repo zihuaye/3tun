@@ -57,6 +57,8 @@ int merge_2 = 1;
 int merge_3 = 0;
 
 int legacy_tunnel = 1;
+int force_legacy = 0;
+
 int tv_us = 0;
 
 /* Host we are working with. 
@@ -228,7 +230,7 @@ int lfd_linker(void)
      char *buf, *out, *pb, *pb2, *pb3;
      fd_set fdset, fdset2;
      int maxfd, idle = 0, tmplen, p, log_merge = 1, log_tunnel = 1;
-     unsigned short *pi, mask;
+     unsigned short *pi, mask, echo_req;
 
      if( !(buf = lfd_alloc((VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)*2)) ){
 	vtun_syslog(LOG_ERR,"Can't allocate buffer for the linker"); 
@@ -241,9 +243,11 @@ int lfd_linker(void)
      legacy_tunnel = 1;
      mask = VTUN_FSIZE_MASK0;
 
+     echo_req = (force_legacy ? VTUN_ECHO_REQ : VTUN_ECHO_REQ2);
+
      /* VTUN_ECHO_REQ2: identify self as a new format tunnel,
  	legacy tunnel will just recognize it as VTUN_ECHO_REQ */
-     proto_write(fd1, buf, VTUN_ECHO_REQ2);
+     proto_write(fd1, buf, echo_req);
 
      maxfd = (fd1 > fd2 ? fd1 : fd2) + 1;
 
@@ -295,7 +299,7 @@ int lfd_linker(void)
 		 break;	
 	      }
 	      /* Send ECHO request */
-	      if( proto_write(fd1, buf, VTUN_ECHO_REQ2) < 0 )
+	      if( proto_write(fd1, buf, echo_req) < 0 )
 		 break;
 	   }
 	   continue;
@@ -317,7 +321,7 @@ int lfd_linker(void)
 	 		continue;
 	  	}
 	      	if( fl==VTUN_ECHO_REQ ){
-			if (len > 0) {
+			if ((len > 0)&&(!force_legacy)) {
 				/* recieved VTUN_ECHO_REQ2, peer tunnel format is a new one */
 				legacy_tunnel = 0;
 	   			mask = VTUN_FSIZE_MASK;
