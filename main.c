@@ -56,8 +56,6 @@ extern int tcp_cork;
 extern int merge_2;
 extern int merge_3;
 
-extern int tv_us;
-
 int main(int argc, char *argv[], char *env[])
 {
      int svr, daemon, sock, dofork, fd, opt;
@@ -97,7 +95,7 @@ int main(int argc, char *argv[], char *env[])
      /* Start logging to syslog and stderr */
      openlog("vtund", LOG_PID | LOG_NDELAY | LOG_PERROR, LOG_DAEMON);
 
-     while( (opt=getopt(argc,argv,"abcdmisf:P:L:t:npu:vh")) != EOF ){
+     while( (opt=getopt(argc,argv,"abcdmisf:P:L:t:npvh")) != EOF ){
 	switch(opt){
 	    case 'a':
 		merge_2 = 0;
@@ -144,9 +142,6 @@ int main(int argc, char *argv[], char *env[])
 	    case 't':
 	        vtun.timeout = atoi(optarg);	
 	        break;
-	    case 'u':
-		tv_us = atoi(optarg);
-		break;
 	    case 'v':
      		printf("VTun ver %s\n", VTUN_VER);
 	        exit(0);
@@ -223,14 +218,14 @@ int main(int argc, char *argv[], char *env[])
         sa.sa_handler=reread_config;
         sigaction(SIGHUP,&sa,NULL);
 
-        init_title(argc,argv,env,"vtund[s]: ");
+        init_title(argc,argv,env,"3tund[s]: ");
 
 	if( vtun.svr_type == VTUN_STAND_ALONE )	
 	   write_pid();
 	
 	server(sock);
      } else {	
-        init_title(argc,argv,env,"vtund[c]: ");
+        init_title(argc,argv,env,"3tund[c]: ");
         client(host);
      }
 
@@ -269,10 +264,10 @@ void usage(void)
      printf("VTun ver %s\n", VTUN_VER);
      printf("Usage: \n");
      printf("  Server:\n");
-     printf("\tvtund <-s> [-f file] [-P port] [-L local address]\n");
+     printf("\tvtund [-f file] [-P port] [-L local address] <-s>\n");
      printf("  Client:\n");
      /* I don't think these work. I'm disabling the suggestion - bish 20050601*/
      printf("\tvtund [-f file] " /* [-P port] [-L local address] */
 	    "[-p] [-m] [-t timeout] <host profile> <server address>\n");
-     printf("  Common options:\n\t-a(1pkt mode) -b(3pkt mode) -c(tcp_cork) -d(tcp_nodelay) -u(tv_usec)\n");
+     printf("  Extra options:\n\t-a(1pkt mode) -b(3pkt mode) -c(tcp_cork) -d(tcp_nodelay)\n");
 }
