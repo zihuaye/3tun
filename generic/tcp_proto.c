@@ -61,8 +61,8 @@ int tcp_write(int fd, char *buf, int len)
      register char *ptr;
      unsigned short mask, plen;
 
-     ptr = buf - sizeof(short);
-     *((unsigned short *)ptr) = htons(len); 
+     ptr = buf - sizeof(short);			//first 2 bytes is frame size
+     *((unsigned short *)ptr) = htons(len); 	//converts host byte order to network byte order
 
      mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
      plen = (len >= VTUN_ECHO_REQ ? sizeof(short) : (len & mask) + sizeof(short));
@@ -79,7 +79,8 @@ int tcp_read(int fd, char *buf)
      if( (rlen = read_n(fd, (char *)&len, sizeof(short)) ) <= 0)
 	return rlen;
 
-     len = ntohs(len);
+     len = ntohs(len);		//converts network byte order to host byte order
+
      mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
      flen = (len >= VTUN_ECHO_REQ ? 0 : len & mask);
 

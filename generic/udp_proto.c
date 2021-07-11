@@ -106,6 +106,7 @@ int udp_read(int fd, char *buf)
 	}
 
         hdr = ntohs(hdr);
+
      	mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
      	flen = (hdr >= VTUN_ECHO_REQ ? 0 : hdr & mask);
 
