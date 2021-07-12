@@ -268,8 +268,8 @@ int lfd_linker(struct thread_args *pt)
 		t1 = 0;
 	}
 
-	vtun_syslog(LOG_INFO, "lfd_linker() t0:%d t1:%d t2:%d p[0]:%d p[1]:%d p[2]:%d p[3]:%d",
-			t0, t1, t2, pt->p[0], pt->p[1], pt->p[2], pt->p[3]); 
+	//vtun_syslog(LOG_INFO, "lfd_linker() t0:%d t1:%d t2:%d p[0]:%d p[1]:%d p[2]:%d p[3]:%d",
+	//		t0, t1, t2, pt->p[0], pt->p[1], pt->p[2], pt->p[3]); 
      }
 
      if( !(buf = lfd_alloc((VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)*2)) ){
