@@ -29,6 +29,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -36,6 +37,8 @@
 
 #include "vtun.h"
 #include "lib.h"
+
+pthread_mutex_t dev_lock;
 
 /* 
  * Allocate TUN device, returns opened fd. 

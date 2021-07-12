@@ -34,6 +34,7 @@
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <errno.h>
+#include <pthread.h>
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
@@ -55,11 +56,17 @@
 #include "lib.h"
 
 extern int legacy_tunnel;
+extern int threading_mode;
+
+pthread_mutex_t proto_lock;
 
 int tcp_write(int fd, char *buf, int len)
 {
      register char *ptr;
      unsigned short mask, plen;
+
+     if (threading_mode)
+	pthread_mutex_lock(&proto_lock);
 
      ptr = buf - sizeof(short);			//first 2 bytes is frame size
      *((unsigned short *)ptr) = htons(len); 	//converts host byte order to network byte order
@@ -67,13 +74,21 @@ int tcp_write(int fd, char *buf, int len)
      mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
      plen = (len >= VTUN_ECHO_REQ ? sizeof(short) : (len & mask) + sizeof(short));
 
-     return write_n(fd, ptr, plen);
+     plen = write_n(fd, ptr, plen);
+
+     if (threading_mode)
+	pthread_mutex_unlock(&proto_lock);
+
+     return plen;
 }
 
 int tcp_read(int fd, char *buf)
 {
      unsigned short len, flen, mask;
      register int rlen;     
+
+     if (threading_mode)
+	pthread_mutex_lock(&proto_lock);
 
      /* Read frame size */
      if( (rlen = read_n(fd, (char *)&len, sizeof(short)) ) <= 0)
@@ -97,9 +112,16 @@ int tcp_read(int fd, char *buf)
 
      if( len & ~mask ){
 	/* Return flags, without data */
+     	if (threading_mode)
+		pthread_mutex_unlock(&proto_lock);
 	return len;
      }
 
      /* Read frame */
-     return read_n(fd, buf, flen);
+     flen = read_n(fd, buf, flen);
+
+     if (threading_mode)
+	pthread_mutex_unlock(&proto_lock);
+
+     return flen;
 }

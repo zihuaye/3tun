@@ -32,6 +32,7 @@
 #include <sys/time.h>
 #include <syslog.h>
 #include <time.h>
+#include <pthread.h>
 
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
@@ -60,6 +61,15 @@ int legacy_tunnel = 1;
 int force_legacy = 0;
 
 int tv_us = 0;
+
+int threading_mode = 0;
+
+struct thread_args {
+	int rl;
+	int *p;
+};
+
+extern  pthread_mutex_t dev_lock, proto_lock;
 
 /* Host we are working with. 
  * Used by signal handlers that's why it is global. 
@@ -221,7 +231,7 @@ static void sig_usr1(int sig)
      lfd_host->stat.comp_in = lfd_host->stat.comp_out = 0; 
 }
 
-int lfd_linker(void)
+int lfd_linker(struct thread_args *pt)
 {
      int fd1 = lfd_host->rmt_fd;
      int fd2 = lfd_host->loc_fd; 
@@ -589,6 +599,16 @@ int linkfd(struct vtun_host *host)
      struct sigaction sa, sa_oldterm, sa_oldint, sa_oldhup;
      int old_prio;
 
+     pthread_t tid[2];
+     struct thread_args t_args_1, t_args_2;
+     int p[4];
+     enum{
+	t1_read  = 0, //read end for proto
+	t2_write = 1, //write end for dev 
+	t2_read  = 2, //read end for dev 
+	t1_write = 3  //write end for proto
+     };
+
      lfd_host = host;
  
      old_prio=getpriority(PRIO_PROCESS,0);
@@ -640,7 +660,33 @@ int linkfd(struct vtun_host *host)
 
      io_init();
 
-     lfd_linker();
+     if (!threading_mode) {
+
+     	lfd_linker(NULL);
+
+     } else {
+
+	if (pipe(&p[t1_read]) == -1 || (pipe(&p[t2_read]) == -1))
+	  return linker_term;
+
+	if ((pthread_mutex_init(&dev_lock, NULL) != 0)||(pthread_mutex_init(&proto_lock, NULL) != 0))
+	  return linker_term;
+
+	t_args_1.rl = 1;
+	t_args_1.p = p;
+	t_args_2.rl = 2;
+	t_args_2.p = p;
+
+	pthread_create(&(tid[0]), NULL, &lfd_linker, &t_args_1);
+	pthread_create(&(tid[1]), NULL, &lfd_linker, &t_args_2);
+
+	pthread_join(tid[0], NULL);
+	pthread_join(tid[1], NULL);
+
+	pthread_mutex_destroy(&dev_lock);
+	pthread_mutex_destroy(&proto_lock);
+
+     }
 
      if( host->flags & VTUN_STAT ){
         alarm(0);

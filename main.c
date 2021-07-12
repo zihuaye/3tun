@@ -57,6 +57,7 @@ extern int merge_2;
 extern int merge_3;
 
 extern int force_legacy;
+extern int threading_mode;
 
 int main(int argc, char *argv[], char *env[])
 {
@@ -97,7 +98,7 @@ int main(int argc, char *argv[], char *env[])
      /* Start logging to syslog and stderr */
      openlog("vtund", LOG_PID | LOG_NDELAY | LOG_PERROR, LOG_DAEMON);
 
-     while( (opt=getopt(argc,argv,"abcdlmisf:P:L:t:npvh")) != EOF ){
+     while( (opt=getopt(argc,argv,"abcdlmisf:P:L:t:npvhT")) != EOF ){
 	switch(opt){
 	    case 'a':
 		merge_2 = 0;
@@ -146,6 +147,9 @@ int main(int argc, char *argv[], char *env[])
 		break;
 	    case 't':
 	        vtun.timeout = atoi(optarg);	
+	        break;
+	    case 'T':
+	        threading_mode = 1;
 	        break;
 	    case 'v':
      		printf("VTun ver %s\n", VTUN_VER);
