@@ -213,6 +213,7 @@ static void sig_term(int sig)
 	  write(t_pipe[3], "VT exit\0", 8);
 	  write(t_pipe[1], "VT exit\0", 8);
      }
+
 }
 
 static void sig_hup(int sig)
@@ -627,18 +628,21 @@ int lfd_linker(struct thread_args *pt)
      if (t1) {
 	if (!peer_close)
      		/* Notify other end about our close */
-     		echo_req = (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE);
-     		proto_write(fd1, buf, echo_req);
+
+		//can not proto_write because io_cancel()
+     		//proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+
+     		*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+     		write(fd1, buf, sizeof(short));
 
 	        vtun_syslog(LOG_INFO,"%s: Notify peer to close", lfd_host->host);
 
-     	if ((!t0)&&(!t2_exit_call)&&(!linker_term))  //call t2 to exit
-	  write(pt->p[3], "VT exit\0", 8);
+     	if ((!t0)&&(!t2_exit_call)&&(!linker_term))
+	  write(pt->p[3], "VT exit\0", 8);  //call t2 to exit
      }
 
-     if (t2&&(!t0)&&(!t1_exit_call)&&(!linker_term)) { //call t1 to exit
-	write(pt->p[1], "VT exit\0", 8);
-     }
+     if (t2&&(!t0)&&(!t1_exit_call)&&(!linker_term))
+	write(pt->p[1], "VT exit\0", 8);  //call t1 to exit
 
      lfd_free(buf);
 
