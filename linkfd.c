@@ -241,7 +241,7 @@ int lfd_linker(struct thread_args *pt)
      fd_set fdset, fdset2;
      int maxfd, idle = 0, tmplen, p, log_merge = 1, log_tunnel = 1;
      unsigned short *pi, mask, echo_req;
-     int t0=1, t1=1, t2=1;
+     int t0=1, t1=1, t2=1, t1_exit_call=0, t2_exit_call=0;
 
      if (pt != NULL) {
      	/* threading init */
@@ -589,13 +589,17 @@ int lfd_linker(struct thread_args *pt)
 
 
 	if( (!t0) && t1 && FD_ISSET(pt->p[0], &fdset) ){
-		if (read(pt->p[0], buf, 8) > 0)
+		if (read(pt->p[0], buf, 8) > 0) {
+			t2_exit_call = 1;
 			break;
+		}
 	}
 
 	if( (!t0) && t2 && FD_ISSET(pt->p[2], &fdset) ){
-		if (read(pt->p[2], buf, 8) > 0)
+		if (read(pt->p[2], buf, 8) > 0) {
+			t1_exit_call = 1;
 			break;
+		}
 	}
 
      }
@@ -610,11 +614,11 @@ int lfd_linker(struct thread_args *pt)
      	/* Notify other end about our close */
      	proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
 
-     	if (!t0)
+     	if ((!t0)&&(!t2_exit_call))  //call t2 to exit
 	  write(pt->p[3], "VT exit\0", 8);
      }
 
-     if (t2&&(!t0)) {
+     if (t2&&(!t0)&&(!t1_exit_call)) { //call t1 to exit
 	write(pt->p[1], "VT exit\0", 8);
      }
 
