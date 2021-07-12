@@ -628,6 +628,7 @@ int lfd_linker(struct thread_args *pt)
 	if (!peer_close)
      		/* Notify other end about our close */
      		proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+	        vtun_syslog(LOG_INFO,"Notify peer to close");
 
      	if ((!t0)&&(!t2_exit_call)&&(!linker_term))  //call t2 to exit
 	  write(pt->p[3], "VT exit\0", 8);
@@ -741,9 +742,10 @@ int linkfd(struct vtun_host *host)
 	pthread_join(tid[0], NULL);
 	pthread_join(tid[1], NULL);
 
+	vtun_syslog(LOG_INFO,"Threads all exited");
+
 	pthread_mutex_destroy(&dev_lock);
 	pthread_mutex_destroy(&proto_lock);
-
      }
 
      if( host->flags & VTUN_STAT ){
