@@ -629,11 +629,17 @@ int lfd_linker(struct thread_args *pt)
 	if (!peer_close)
      		/* Notify other end about our close */
 
-		//can not proto_write because io_cancel()
+		//when killing, can not proto_write because io_cancel()
      		//proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
 
      		*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+		if (!t0)
+			pthread_mutex_lock(&proto_lock);
+
      		write(fd1, buf, sizeof(short));
+
+		if (!t0)
+			pthread_mutex_unlock(&proto_lock);
 
 	        vtun_syslog(LOG_INFO,"%s: Notify peer to close", lfd_host->host);
 
