@@ -254,7 +254,7 @@ int lfd_linker(struct thread_args *pt)
      fd_set fdset, fdset2;
      int maxfd, idle = 0, tmplen, p, log_merge = 1, log_tunnel = 1;
      unsigned short *pi, mask, echo_req;
-     int t0=1, t1=1, t2=1, t1_exit_call=0, t2_exit_call=0;
+     int t0=1, t1=1, t2=1, t1_exit_call=0, t2_exit_call=0, peer_close=0;
 
      if (pt != NULL) {
      	/* threading init */
@@ -391,6 +391,7 @@ int lfd_linker(struct thread_args *pt)
 		 	continue;
 	      	}
 	      	if( (fl==VTUN_CONN_CLOSE)||(fl==VTUN_CONN_CLOSE0) ){
+			peer_close = 1;
 	         	vtun_syslog(LOG_INFO,"Connection closed by other side");
 		 	break;
 	      	}
@@ -624,8 +625,9 @@ int lfd_linker(struct thread_args *pt)
      }
 
      if (t1) {
-     	/* Notify other end about our close */
-     	proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+	if (!peer_close)
+     		/* Notify other end about our close */
+     		proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
 
      	if ((!t0)&&(!t2_exit_call)&&(!linker_term))  //call t2 to exit
 	  write(pt->p[3], "VT exit\0", 8);
