@@ -40,6 +40,8 @@
 
 pthread_mutex_t dev_lock;
 
+extern int threading_mode;
+
 /* 
  * Allocate TUN device, returns opened fd. 
  * Stores dev name in the first arg(must be large enough).
@@ -129,7 +131,31 @@ int tap_close(int fd, char *dev) { return close(fd); }
 
 /* Read/write frames from TUN device */
 int tun_write(int fd, char *buf, int len) { return write(fd, buf, len); }
-int tap_write(int fd, char *buf, int len) { return write(fd, buf, len); }
+int tap_write(int fd, char *buf, int len) { 
+  int n=0;
+
+  if (threading_mode)
+	pthread_mutex_lock(&dev_lock);
+
+  n = write(fd, buf, len); 
+
+  if (threading_mode)
+	pthread_mutex_unlock(&dev_lock);
+
+  return n;
+}
 
 int tun_read(int fd, char *buf, int len) { return read(fd, buf, len); }
-int tap_read(int fd, char *buf, int len) { return read(fd, buf, len); }
+int tap_read(int fd, char *buf, int len) {
+  int n=0;
+
+  if (threading_mode)
+	pthread_mutex_lock(&dev_lock);
+
+  n = read(fd, buf, len); 
+
+  if (threading_mode)
+	pthread_mutex_unlock(&dev_lock);
+
+  return n;
+}

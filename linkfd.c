@@ -241,19 +241,22 @@ int lfd_linker(struct thread_args *pt)
      fd_set fdset, fdset2;
      int maxfd, idle = 0, tmplen, p, log_merge = 1, log_tunnel = 1;
      unsigned short *pi, mask, echo_req;
-     int t0=0, t1=0, t2=0;
+     int t0=1, t1=1, t2=1;
 
-     /* threading init */
      if (pt != NULL) {
+     	/* threading init */
+	t0 = 0;
+
 	if (pt->rl == 1) {
-		//remote threading
-		t1 = 1;
+		//remote proto thread
+		t2 = 0;
 	} else if (pt->rl == 2) {
-		//local threading
-		t2 = 1;
+		//local dev thread
+		t1 = 0;
 	}
-     } else {
-	t0 = 1;
+
+	vtun_syslog(LOG_INFO, "lfd_linker() t0:%d t1:%d t2:%d p[0]:%d p[1]:%d p[2]:%d p[3]:%d",
+			t0, t1, t2, pt->p[0], pt->p[1], pt->p[2], pt->p[3]); 
      }
 
      if( !(buf = lfd_alloc((VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)*2)) ){
@@ -271,9 +274,13 @@ int lfd_linker(struct thread_args *pt)
 
      /* VTUN_ECHO_REQ2: identify self as a new format tunnel,
  	legacy tunnel will just recognize it as VTUN_ECHO_REQ */
-     proto_write(fd1, buf, echo_req);
+     if (t1)
+	/* t1==1: remote proto thread */
+     	proto_write(fd1, buf, echo_req);
 
-     maxfd = (fd1 > fd2 ? fd1 : fd2) + 1;
+     if (t0)
+	/* none thread */
+     	maxfd = (fd1 > fd2 ? fd1 : fd2) + 1;
 
      linker_term = 0;
      while( !linker_term ){
@@ -281,8 +288,23 @@ int lfd_linker(struct thread_args *pt)
 
         /* Wait for data */
         FD_ZERO(&fdset);
-	FD_SET(fd1, &fdset);
-	FD_SET(fd2, &fdset);
+	if (t0) {
+		FD_SET(fd1, &fdset);
+		FD_SET(fd2, &fdset);
+	} else {
+		if (t1) {
+			//select remote fd1 and t1_read
+			FD_SET(fd1, &fdset);
+			FD_SET(pt->p[0], &fdset);
+     			maxfd = (fd1 > pt->p[0] ? fd1 : pt->p[0]) + 1;
+		}
+		if (t2) {
+			//select local dev fd2 and t2_read
+			FD_SET(fd2, &fdset);
+			FD_SET(pt->p[2], &fdset);
+     			maxfd = (fd2 > pt->p[2] ? fd2 : pt->p[2]) + 1;
+		}
+	}
 
  	tv.tv_sec  = lfd_host->ka_interval;
 	tv.tv_usec = 0;
@@ -293,7 +315,7 @@ int lfd_linker(struct thread_args *pt)
 	   else
 	      continue;
 	} 
-	if (send_a_packet)
+	if (send_a_packet&&t2)
         {
            send_a_packet = 0;
            tmplen = 1;
@@ -304,18 +326,7 @@ int lfd_linker(struct thread_args *pt)
 	      break;
 	   lfd_host->stat.comp_out += tmplen; 
         }
-	if( !len ){
-           if (send_a_packet)
-           {
-              send_a_packet = 0;
-              tmplen = 1;
-	      lfd_host->stat.byte_out += tmplen; 
-   	      if( (tmplen=lfd_run_down(tmplen,buf,&out)) == -1 )
-	         break;
-	      if( tmplen && proto_write(fd1, out, tmplen) < 0 )
-	         break;
-	      lfd_host->stat.comp_out += tmplen; 
-           }
+	if( (!len)&&t1 ){
 	   /* We are idle, lets check connection */
 	   if( lfd_host->flags & VTUN_KEEP_ALIVE ){
 	      if( ++idle > lfd_host->ka_failure ){
@@ -331,7 +342,7 @@ int lfd_linker(struct thread_args *pt)
 
 	/* Read frames from network(fd1), decode and pass them to 
          * the local device (fd2) */
-	if( FD_ISSET(fd1, &fdset) && lfd_check_up() ){
+	if( t1 && FD_ISSET(fd1, &fdset) && lfd_check_up() ){
 	   idle = 0; 
 	   if( (len=proto_read(fd1, buf)) <= 0 )
 	      break;
@@ -442,7 +453,7 @@ int lfd_linker(struct thread_args *pt)
 
 	/* Read data from the local device(fd2), encode and pass it to 
          * the network (fd1) */
-	if( FD_ISSET(fd2, &fdset) && lfd_check_down() ){
+	if( t2 && FD_ISSET(fd2, &fdset) && lfd_check_down() ){
 	   if( (len = dev_read(fd2, buf, VTUN_FRAME_SIZE)) < 0 ){
 	   	if( errno != EAGAIN && errno != EINTR )
 	       		break;
@@ -575,6 +586,18 @@ int lfd_linker(struct thread_args *pt)
 	   /* new impovement tunnel code end */
 
 	}
+
+
+	if( (!t0) && t1 && FD_ISSET(pt->p[0], &fdset) ){
+		if (read(pt->p[0], buf, 8) > 0)
+			break;
+	}
+
+	if( (!t0) && t2 && FD_ISSET(pt->p[2], &fdset) ){
+		if (read(pt->p[2], buf, 8) > 0)
+			break;
+	}
+
      }
      if( !linker_term && errno )
 	vtun_syslog(LOG_INFO,"%s (%d)", strerror(errno), errno);
@@ -583,8 +606,17 @@ int lfd_linker(struct thread_args *pt)
        lfd_host->persist = 0;
      }
 
-     /* Notify other end about our close */
-     proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+     if (t1) {
+     	/* Notify other end about our close */
+     	proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+
+     	if (!t0)
+	  write(pt->p[3], "VT exit\0", 8);
+     }
+
+     if (t2&&(!t0)) {
+	write(pt->p[1], "VT exit\0", 8);
+     }
 
      lfd_free(buf);
 
