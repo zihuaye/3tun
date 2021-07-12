@@ -205,11 +205,11 @@ static volatile sig_atomic_t linker_term;
 
 static void sig_term(int sig)
 {
-     vtun_syslog(LOG_INFO, "Closing connection");
+     vtun_syslog(LOG_INFO, "%s: Closing connection", lfd_host->host);
      io_cancel();
      linker_term = VTUN_SIG_TERM;
-     if (threading_mode) {
-	  //call threads to exit
+
+     if (threading_mode) { //call threads to exit
 	  write(t_pipe[3], "VT exit\0", 8);
 	  write(t_pipe[1], "VT exit\0", 8);
      }
@@ -217,7 +217,7 @@ static void sig_term(int sig)
 
 static void sig_hup(int sig)
 {
-     vtun_syslog(LOG_INFO, "Reestablishing connection");
+     vtun_syslog(LOG_INFO, "%s: Reestablishing connection", lfd_host->host);
      io_cancel();
      linker_term = VTUN_SIG_HUP;
 }
@@ -364,9 +364,8 @@ int lfd_linker(struct thread_args *pt)
 	   fl = len & ~mask;
            len = len & mask;
 	   if( fl ){
-	        vtun_syslog(LOG_INFO,"%s: peer send flag:%d", lfd_host->host, fl);
 	    	if( fl==VTUN_BAD_FRAME ){
-	 		vtun_syslog(LOG_ERR, "Received bad frame");
+	 		vtun_syslog(LOG_ERR, "%s: Received bad frame", lfd_host->host);
 	 		continue;
 	  	}
 	      	if( fl==VTUN_ECHO_REQ ){
@@ -393,7 +392,7 @@ int lfd_linker(struct thread_args *pt)
 	      	}
 	      	if( (fl==VTUN_CONN_CLOSE)||(fl==VTUN_CONN_CLOSE0) ){
 			peer_close = 1;
-	         	vtun_syslog(LOG_INFO,"Connection closed by other side");
+	         	vtun_syslog(LOG_INFO,"%s: Connection closed by other side", lfd_host->host);
 		 	break;
 	      	}
 	   }   
@@ -628,8 +627,10 @@ int lfd_linker(struct thread_args *pt)
      if (t1) {
 	if (!peer_close)
      		/* Notify other end about our close */
-     		proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
-	        vtun_syslog(LOG_INFO,"Notify peer to close");
+     		echo_req = (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE);
+     		proto_write(fd1, buf, echo_req);
+
+	        vtun_syslog(LOG_INFO,"%s: Notify peer to close", lfd_host->host);
 
      	if ((!t0)&&(!t2_exit_call)&&(!linker_term))  //call t2 to exit
 	  write(pt->p[3], "VT exit\0", 8);
@@ -743,7 +744,7 @@ int linkfd(struct vtun_host *host)
 	pthread_join(tid[0], NULL);
 	pthread_join(tid[1], NULL);
 
-	vtun_syslog(LOG_INFO,"Threads all exited");
+	vtun_syslog(LOG_INFO,"%s: Threads all exited", lfd_host->host);
 
 	pthread_mutex_destroy(&dev_lock);
 	pthread_mutex_destroy(&proto_lock);
