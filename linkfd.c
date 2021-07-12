@@ -69,6 +69,14 @@ struct thread_args {
 	int *p;
 };
 
+int t_pipe[4];
+enum{
+  t1_read  = 0, //read end for proto
+  t2_write = 1, //write end for dev 
+  t2_read  = 2, //read end for dev 
+  t1_write = 3  //write end for proto
+};
+
 extern  pthread_mutex_t dev_lock, proto_lock;
 
 /* Host we are working with. 
@@ -200,6 +208,11 @@ static void sig_term(int sig)
      vtun_syslog(LOG_INFO, "Closing connection");
      io_cancel();
      linker_term = VTUN_SIG_TERM;
+     if (threading_mode) {
+	  //call threads to exit
+	  write(t_pipe[3], "VT exit\0", 8);
+	  write(t_pipe[1], "VT exit\0", 8);
+     }
 }
 
 static void sig_hup(int sig)
@@ -651,13 +664,6 @@ int linkfd(struct vtun_host *host)
 
      pthread_t tid[2];
      struct thread_args t_args_1, t_args_2;
-     int p[4];
-     enum{
-	t1_read  = 0, //read end for proto
-	t2_write = 1, //write end for dev 
-	t2_read  = 2, //read end for dev 
-	t1_write = 3  //write end for proto
-     };
 
      lfd_host = host;
  
@@ -716,16 +722,16 @@ int linkfd(struct vtun_host *host)
 
      } else {
 
-	if (pipe(&p[t1_read]) == -1 || (pipe(&p[t2_read]) == -1))
+	if (pipe(&t_pipe[t1_read]) == -1 || (pipe(&t_pipe[t2_read]) == -1))
 	  return linker_term;
 
 	if ((pthread_mutex_init(&dev_lock, NULL) != 0)||(pthread_mutex_init(&proto_lock, NULL) != 0))
 	  return linker_term;
 
 	t_args_1.rl = 1;
-	t_args_1.p = p;
+	t_args_1.p = t_pipe;
 	t_args_2.rl = 2;
-	t_args_2.p = p;
+	t_args_2.p = t_pipe;
 
 	pthread_create(&(tid[0]), NULL, &lfd_linker, &t_args_1);
 	pthread_create(&(tid[1]), NULL, &lfd_linker, &t_args_2);
