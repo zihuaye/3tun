@@ -364,6 +364,7 @@ int lfd_linker(struct thread_args *pt)
 	   fl = len & ~mask;
            len = len & mask;
 	   if( fl ){
+	        vtun_syslog(LOG_INFO,"%s: peer send flag:%d", lfd_host->host, fl);
 	    	if( fl==VTUN_BAD_FRAME ){
 	 		vtun_syslog(LOG_ERR, "Received bad frame");
 	 		continue;
