@@ -241,6 +241,20 @@ int lfd_linker(struct thread_args *pt)
      fd_set fdset, fdset2;
      int maxfd, idle = 0, tmplen, p, log_merge = 1, log_tunnel = 1;
      unsigned short *pi, mask, echo_req;
+     int t0=0, t1=0, t2=0;
+
+     /* threading init */
+     if (pt != NULL) {
+	if (pt->rl == 1) {
+		//remote threading
+		t1 = 1;
+	} else if (pt->rl == 2) {
+		//local threading
+		t2 = 1;
+	}
+     } else {
+	t0 = 1;
+     }
 
      if( !(buf = lfd_alloc((VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)*2)) ){
 	vtun_syslog(LOG_ERR,"Can't allocate buffer for the linker"); 
