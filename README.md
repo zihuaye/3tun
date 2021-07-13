@@ -22,3 +22,6 @@ Base on vtun-3.0.2, has following improvement:
 
   (option -l: `force_legacy` mode, acts just like an old vtun-3.0.2 tunnel)
 - OpenSSL 1.1 and crypto engine support.(via patch)
+- The 'multithreading' branch code support bi-direction of tunnel doing full duplex transmission without a r/w lock. Which gains about 5%-10% performance increasing.
+
+  (option -T: `threading_mode`)
