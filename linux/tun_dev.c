@@ -38,7 +38,7 @@
 #include "vtun.h"
 #include "lib.h"
 
-pthread_mutex_t dev_lock;
+pthread_rwlock_t dev_lock;
 
 extern int threading_mode;
 
@@ -130,32 +130,50 @@ int tun_close(int fd, char *dev) { return close(fd); }
 int tap_close(int fd, char *dev) { return close(fd); }
 
 /* Read/write frames from TUN device */
-int tun_write(int fd, char *buf, int len) { return write(fd, buf, len); }
-int tap_write(int fd, char *buf, int len) { 
+int tun_write(int fd, char *buf, int len) {
   int n=0;
-
-  if (threading_mode)
-	pthread_mutex_lock(&dev_lock);
-
-  n = write(fd, buf, len); 
-
-  if (threading_mode)
-	pthread_mutex_unlock(&dev_lock);
-
-  return n;
+  if (threading_mode) {
+	pthread_rwlock_wrlock(&dev_lock);
+	n = write(fd, buf, len); 
+	pthread_rwlock_unlock(&dev_lock);
+  	return n;
+   } else {
+  	return write(fd, buf, len);
+   }
 }
 
-int tun_read(int fd, char *buf, int len) { return read(fd, buf, len); }
+int tap_write(int fd, char *buf, int len) { 
+  int n=0;
+  if (threading_mode) {
+	pthread_rwlock_wrlock(&dev_lock);
+	n = write(fd, buf, len); 
+	pthread_rwlock_unlock(&dev_lock);
+  	return n;
+   } else {
+  	return write(fd, buf, len);
+   }
+}
+
+int tun_read(int fd, char *buf, int len) {
+  int n=0;
+  if (threading_mode) {
+	pthread_rwlock_rdlock(&dev_lock);
+	n = read(fd, buf, len); 
+	pthread_rwlock_unlock(&dev_lock);
+	return n;
+  } else {
+	return read(fd, buf, len);
+  }
+}
+
 int tap_read(int fd, char *buf, int len) {
   int n=0;
-
-  if (threading_mode)
-	pthread_mutex_lock(&dev_lock);
-
-  n = read(fd, buf, len); 
-
-  if (threading_mode)
-	pthread_mutex_unlock(&dev_lock);
-
-  return n;
+  if (threading_mode) {
+	pthread_rwlock_rdlock(&dev_lock);
+	n = read(fd, buf, len); 
+	pthread_rwlock_unlock(&dev_lock);
+	return n;
+  } else {
+	return read(fd, buf, len);
+  }
 }

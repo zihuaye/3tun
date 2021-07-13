@@ -77,7 +77,7 @@ enum{
   t1_write = 3  //write end for proto
 };
 
-extern  pthread_mutex_t dev_lock, proto_lock;
+extern  pthread_rwlock_t dev_lock, proto_lock;
 
 /* Host we are working with. 
  * Used by signal handlers that's why it is global. 
@@ -628,18 +628,15 @@ int lfd_linker(struct thread_args *pt)
      if (t1) {
 	if (!peer_close)
      		/* Notify other end about our close */
-
-		//when killing, can not proto_write because io_cancel()
-     		//proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
-
-     		*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
-		if (!t0)
-			pthread_mutex_lock(&proto_lock);
-
-     		write(fd1, buf, sizeof(short));
-
-		if (!t0)
-			pthread_mutex_unlock(&proto_lock);
+		if (!t0) {
+			//when killing, can not proto_write because io_cancel()
+     			*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+			pthread_rwlock_wrlock(&proto_lock);
+     			write(fd1, buf, sizeof(short));
+			pthread_rwlock_unlock(&proto_lock);
+		} else {
+     			proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+		}
 
 	        vtun_syslog(LOG_INFO,"%s: Notify peer to close", lfd_host->host);
 
@@ -740,7 +737,7 @@ int linkfd(struct vtun_host *host)
 	if (pipe(&t_pipe[t1_read]) == -1 || (pipe(&t_pipe[t2_read]) == -1))
 	  return linker_term;
 
-	if ((pthread_mutex_init(&dev_lock, NULL) != 0)||(pthread_mutex_init(&proto_lock, NULL) != 0))
+	if ((pthread_rwlock_init(&dev_lock, NULL) != 0)||(pthread_rwlock_init(&proto_lock, NULL) != 0))
 	  return linker_term;
 
 	t_args_1.rl = 1;
@@ -756,8 +753,8 @@ int linkfd(struct vtun_host *host)
 
 	vtun_syslog(LOG_INFO,"%s: Threads all exited", lfd_host->host);
 
-	pthread_mutex_destroy(&dev_lock);
-	pthread_mutex_destroy(&proto_lock);
+	pthread_rwlock_destroy(&dev_lock);
+	pthread_rwlock_destroy(&proto_lock);
      }
 
      if( host->flags & VTUN_STAT ){
