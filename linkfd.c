@@ -63,6 +63,7 @@ int force_legacy = 0;
 int tv_us = 0;
 
 int threading_mode = 0;
+int peer_close = 0;
 
 struct thread_args {
 	int rl;
@@ -257,7 +258,7 @@ int lfd_linker(struct thread_args *pt)
      fd_set fdset, fdset2;
      int maxfd, idle = 0, tmplen, p, log_merge = 1, log_tunnel = 1;
      unsigned short *pi, mask, echo_req, flag;
-     int t0=1, t1=1, t2=1, t1_exit_call=0, t2_exit_call=0, peer_close=0;
+     int t0=1, t1=1, t2=1, t1_exit_call=0, t2_exit_call=0;
 
      if (pt != NULL) {
      	/* threading init */
@@ -633,10 +634,12 @@ int lfd_linker(struct thread_args *pt)
 				/* t1 call me to exit */
 				t1_exit_call = 1;
 
-				/* before exit thread, inform peer about close */
-				*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
-				write(fd1, buf, sizeof(short));
-       				vtun_syslog(LOG_INFO,"%s: t2 notify peer to close", lfd_host->host);
+				if (!peer_close) {
+					/* before exit thread, inform peer about close */
+					*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+					write(fd1, buf, sizeof(short));
+       					vtun_syslog(LOG_INFO,"%s: t2 notify peer to close", lfd_host->host);
+				}
 				break;
 			}
 		}
