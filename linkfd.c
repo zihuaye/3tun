@@ -751,7 +751,7 @@ int linkfd(struct vtun_host *host)
 	pthread_join(tid[0], NULL);
 	pthread_join(tid[1], NULL);
 
-	vtun_syslog(LOG_INFO,"%s: Threads all exited", lfd_host->host);
+	vtun_syslog(LOG_INFO,"%s: Dev/Proto threads exited", lfd_host->host);
 
 	pthread_rwlock_destroy(&dev_lock);
 	pthread_rwlock_destroy(&proto_lock);
