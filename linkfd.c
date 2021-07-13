@@ -396,7 +396,7 @@ int lfd_linker(struct thread_args *pt)
 	      	}
 	      	if( (fl==VTUN_CONN_CLOSE)||(fl==VTUN_CONN_CLOSE0) ){
 			peer_close = 1;
-	         	vtun_syslog(LOG_INFO,"%s: Connection closed by other side", lfd_host->host);
+	         	vtun_syslog(LOG_INFO,"%s: connection closed by other side", lfd_host->host);
 		 	break;
 	      	}
 	   }   
@@ -649,30 +649,25 @@ int lfd_linker(struct thread_args *pt)
        lfd_host->persist = 0;
      }
 
-     if (t1) {
-	if (!peer_close) {
-     		/* Notify other end about our close */
+     if (t2&&(!peer_close)) {
+	/* Notify other end about our close */
+
+	if (!t0) {
+     		proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+	} else {
+		/* when killing process, can not proto_write() because io_cancel(),
+ 	   	   we need to write flag directly */
 
 		*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
-
-		if (!t0) {
-			write(pt->p[3], buf, sizeof(short));
-		} else {
-     			//proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
-     			
-			/* when killing process, can not proto_write() because io_cancel(),
- 		   	   we need to write flag directly */
-
-			write(fd1, buf, sizeof(short));
-		}
-
-	        vtun_syslog(LOG_INFO,"%s: Notify peer to close", lfd_host->host);
+		write(fd1, buf, sizeof(short));
 	}
 
-     	if ((!t0)&&(!t2_exit_call)&&(!linker_term)) {
+        vtun_syslog(LOG_INFO,"%s: notify peer to close", lfd_host->host);
+     }
+
+     if (t1&&(!t0)&&(!t2_exit_call)&&(!linker_term)) {
 	  *((unsigned short *)buf) = htons(VTUN_T_EXIT);
 	  write(pt->p[3], buf, sizeof(short));	//call t2 to exit
-	}
      }
 
      if (t2&&(!t0)&&(!t1_exit_call)&&(!linker_term)) {
