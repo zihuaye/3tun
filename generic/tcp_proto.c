@@ -83,11 +83,11 @@ int tcp_write(int fd, char *buf, int len)
 
 int tcp_read(int fd, char *buf)
 {
-     unsigned short len, flen, mask, n;
+     unsigned short len, flen, mask;
      register int rlen;
 
-     if (threading_mode)
-	pthread_rwlock_rdlock(&proto_lock);
+     //if (threading_mode)
+	//pthread_rwlock_rdlock(&proto_lock);
 
      /* Read frame size */
      if( (rlen = read_n(fd, (char *)&len, sizeof(short)) ) <= 0)
@@ -111,16 +111,14 @@ int tcp_read(int fd, char *buf)
 
      if( len & ~mask ){
 	/* Return flags, without data */
-     	if (threading_mode)
-		pthread_rwlock_unlock(&proto_lock);
+     	//if (threading_mode)
+		//pthread_rwlock_unlock(&proto_lock);
 	return len;
      }
 
      /* Read frame */
-     n = read_n(fd, buf, flen);
+     return read_n(fd, buf, flen);
 
-     if (threading_mode)
-	pthread_rwlock_unlock(&proto_lock);
-
-     return n;
+     //if (threading_mode)
+	//pthread_rwlock_unlock(&proto_lock);
 }
