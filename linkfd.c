@@ -77,7 +77,7 @@ enum{
   t1_write = 3  //write end for proto
 };
 
-extern  pthread_rwlock_t dev_lock, proto_lock;
+extern  pthread_rwlock_t proto_lock;
 
 /* Host we are working with. 
  * Used by signal handlers that's why it is global. 
@@ -743,7 +743,7 @@ int linkfd(struct vtun_host *host)
 	if (pipe(&t_pipe[t1_read]) == -1 || (pipe(&t_pipe[t2_read]) == -1))
 	  return linker_term;
 
-	if ((pthread_rwlock_init(&dev_lock, NULL) != 0)||(pthread_rwlock_init(&proto_lock, NULL) != 0))
+	if (pthread_rwlock_init(&proto_lock, NULL) != 0)
 	  return linker_term;
 
 	t_args_1.rl = 1;
@@ -758,7 +758,6 @@ int linkfd(struct vtun_host *host)
 	pthread_join(tid[0], NULL);
 	pthread_join(tid[1], NULL);
 
-	pthread_rwlock_destroy(&dev_lock);
 	pthread_rwlock_destroy(&proto_lock);
 
 	vtun_syslog(LOG_INFO,"%s: Dev/Proto threads exited", lfd_host->host);

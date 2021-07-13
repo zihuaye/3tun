@@ -29,7 +29,6 @@
 #include <string.h>
 #include <syslog.h>
 #include <errno.h>
-#include <pthread.h>
 
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -37,10 +36,6 @@
 
 #include "vtun.h"
 #include "lib.h"
-
-pthread_rwlock_t dev_lock;
-
-extern int threading_mode;
 
 /* 
  * Allocate TUN device, returns opened fd. 
@@ -130,50 +125,8 @@ int tun_close(int fd, char *dev) { return close(fd); }
 int tap_close(int fd, char *dev) { return close(fd); }
 
 /* Read/write frames from TUN device */
-int tun_write(int fd, char *buf, int len) {
-  int n=0;
-  if (threading_mode) {
-	pthread_rwlock_wrlock(&dev_lock);
-	n = write(fd, buf, len); 
-	pthread_rwlock_unlock(&dev_lock);
-  	return n;
-   } else {
-  	return write(fd, buf, len);
-   }
-}
+int tun_write(int fd, char *buf, int len) { return write(fd, buf, len); }
+int tap_write(int fd, char *buf, int len) { return write(fd, buf, len); }
 
-int tap_write(int fd, char *buf, int len) { 
-  int n=0;
-  if (threading_mode) {
-	pthread_rwlock_wrlock(&dev_lock);
-	n = write(fd, buf, len); 
-	pthread_rwlock_unlock(&dev_lock);
-  	return n;
-   } else {
-  	return write(fd, buf, len);
-   }
-}
-
-int tun_read(int fd, char *buf, int len) {
-  int n=0;
-  if (threading_mode) {
-	pthread_rwlock_rdlock(&dev_lock);
-	n = read(fd, buf, len); 
-	pthread_rwlock_unlock(&dev_lock);
-	return n;
-  } else {
-	return read(fd, buf, len);
-  }
-}
-
-int tap_read(int fd, char *buf, int len) {
-  int n=0;
-  if (threading_mode) {
-	pthread_rwlock_rdlock(&dev_lock);
-	n = read(fd, buf, len); 
-	pthread_rwlock_unlock(&dev_lock);
-	return n;
-  } else {
-	return read(fd, buf, len);
-  }
-}
+int tun_read(int fd, char *buf, int len) { return read(fd, buf, len); }
+int tap_read(int fd, char *buf, int len) { return read(fd, buf, len); }
