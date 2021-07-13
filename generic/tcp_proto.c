@@ -56,14 +56,11 @@
 #include "lib.h"
 
 extern int legacy_tunnel;
-extern int threading_mode;
-
-pthread_rwlock_t proto_lock;
 
 int tcp_write(int fd, char *buf, int len)
 {
      register char *ptr;
-     unsigned short mask, plen, n;
+     unsigned short mask, plen;
 
      ptr = buf - sizeof(short);			//first 2 bytes is frame size
      *((unsigned short *)ptr) = htons(len); 	//converts host byte order to network byte order
@@ -71,23 +68,13 @@ int tcp_write(int fd, char *buf, int len)
      mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
      plen = (len >= VTUN_ECHO_REQ ? sizeof(short) : (len & mask) + sizeof(short));
 
-     if (threading_mode) {
-	pthread_rwlock_wrlock(&proto_lock);
-     	n = write_n(fd, ptr, plen);
-	pthread_rwlock_unlock(&proto_lock);
-     	return n;
-     } else {
-     	return write_n(fd, ptr, plen);
-     }
+     return write_n(fd, ptr, plen);
 }
 
 int tcp_read(int fd, char *buf)
 {
      unsigned short len, flen, mask;
      register int rlen;
-
-     //if (threading_mode)
-	//pthread_rwlock_rdlock(&proto_lock);
 
      /* Read frame size */
      if( (rlen = read_n(fd, (char *)&len, sizeof(short)) ) <= 0)
@@ -111,14 +98,9 @@ int tcp_read(int fd, char *buf)
 
      if( len & ~mask ){
 	/* Return flags, without data */
-     	//if (threading_mode)
-		//pthread_rwlock_unlock(&proto_lock);
 	return len;
      }
 
      /* Read frame */
      return read_n(fd, buf, flen);
-
-     //if (threading_mode)
-	//pthread_rwlock_unlock(&proto_lock);
 }

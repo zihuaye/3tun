@@ -179,6 +179,8 @@ extern llist host_list;
 #define VTUN_CONN_CLOSE 	0x6000
 #define VTUN_BAD_FRAME  	0x8000
 
+#define VTUN_T_EXIT		0x0000  //thread exit flag
+
 /* Authentication message size */
 #define VTUN_MESG_SIZE		50
 
