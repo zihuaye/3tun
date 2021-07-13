@@ -636,6 +636,7 @@ int lfd_linker(struct thread_args *pt)
 				/* before exit thread, inform peer about close */
 				*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
 				write(fd1, buf, sizeof(short));
+       				vtun_syslog(LOG_INFO,"%s: t2 notify peer to close", lfd_host->host);
 				break;
 			}
 		}
