@@ -205,15 +205,15 @@ static volatile sig_atomic_t linker_term;
 
 static void sig_term(int sig)
 {
+     if (threading_mode) {
+	/* inform threads to exit */
+	write(t_pipe[3], "VT exit\0", 8); //call t2
+	write(t_pipe[1], "VT exit\0", 8); //call t1
+     }
+
      vtun_syslog(LOG_INFO, "%s: Closing connection", lfd_host->host);
      io_cancel();
      linker_term = VTUN_SIG_TERM;
-
-     if (threading_mode) { //call threads to exit
-	  write(t_pipe[3], "VT exit\0", 8);
-	  write(t_pipe[1], "VT exit\0", 8);
-     }
-
 }
 
 static void sig_hup(int sig)
@@ -268,9 +268,6 @@ int lfd_linker(struct thread_args *pt)
 		//local dev thread
 		t1 = 0;
 	}
-
-	//vtun_syslog(LOG_INFO, "lfd_linker() t0:%d t1:%d t2:%d p[0]:%d p[1]:%d p[2]:%d p[3]:%d",
-	//		t0, t1, t2, pt->p[0], pt->p[1], pt->p[2], pt->p[3]); 
      }
 
      if( !(buf = lfd_alloc((VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)*2)) ){
@@ -604,6 +601,7 @@ int lfd_linker(struct thread_args *pt)
 
 
 	if( (!t0) && t1 && FD_ISSET(pt->p[0], &fdset) ){
+		/* t2 call me to exit */
 		if (read(pt->p[0], buf, 8) > 0) {
 			t2_exit_call = 1;
 			break;
@@ -611,6 +609,7 @@ int lfd_linker(struct thread_args *pt)
 	}
 
 	if( (!t0) && t2 && FD_ISSET(pt->p[2], &fdset) ){
+		/* t1 call me to exit */
 		if (read(pt->p[2], buf, 8) > 0) {
 			t1_exit_call = 1;
 			break;
@@ -626,12 +625,16 @@ int lfd_linker(struct thread_args *pt)
      }
 
      if (t1) {
-	if (!peer_close)
+	if (!peer_close) {
      		/* Notify other end about our close */
 
-		//when killing, can not proto_write because io_cancel()
      		//proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+
+		/* when killing process, can not proto_write() because io_cancel(),
+ 		   we need to write flag directly */
+
 		*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+
 		if (!t0) {
 			pthread_rwlock_wrlock(&proto_lock);
 			write(fd1, buf, sizeof(short));
@@ -641,13 +644,14 @@ int lfd_linker(struct thread_args *pt)
 		}
 
 	        vtun_syslog(LOG_INFO,"%s: Notify peer to close", lfd_host->host);
+	}
 
      	if ((!t0)&&(!t2_exit_call)&&(!linker_term))
-	  write(pt->p[3], "VT exit\0", 8);  //call t2 to exit
+	  write(pt->p[3], "VT exit\0", 8);	//call t2 to exit
      }
 
      if (t2&&(!t0)&&(!t1_exit_call)&&(!linker_term))
-	write(pt->p[1], "VT exit\0", 8);  //call t1 to exit
+	write(pt->p[1], "VT exit\0", 8);	//call t1 to exit
 
      lfd_free(buf);
 
@@ -744,6 +748,7 @@ int linkfd(struct vtun_host *host)
 
 	t_args_1.rl = 1;
 	t_args_1.p = t_pipe;
+
 	t_args_2.rl = 2;
 	t_args_2.p = t_pipe;
 
@@ -753,10 +758,10 @@ int linkfd(struct vtun_host *host)
 	pthread_join(tid[0], NULL);
 	pthread_join(tid[1], NULL);
 
-	vtun_syslog(LOG_INFO,"%s: Dev/Proto threads exited", lfd_host->host);
-
 	pthread_rwlock_destroy(&dev_lock);
 	pthread_rwlock_destroy(&proto_lock);
+
+	vtun_syslog(LOG_INFO,"%s: Dev/Proto threads exited", lfd_host->host);
      }
 
      if( host->flags & VTUN_STAT ){

@@ -278,5 +278,5 @@ void usage(void)
      /* I don't think these work. I'm disabling the suggestion - bish 20050601*/
      printf("\tvtund [-f file] " /* [-P port] [-L local address] */
 	    "[-p] [-m] [-t timeout] <host profile> <server address>\n");
-     printf("  Extra options:\n\t-a(1pkt mode) -b(3pkt mode) -c(tcp_cork) -d(tcp_nodelay) -l(force_legacy)\n");
+     printf("  Extra options:\n\t-a(1pkt mode) -b(3pkt mode) -c(tcp_cork) -d(tcp_nodelay) -l(force_legacy) -T(threading_mode)\n");
 }
