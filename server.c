@@ -85,7 +85,7 @@ void connection(int sock)
 	sa.sa_flags=SA_NOCLDWAIT;;
         sigaction(SIGHUP,&sa,NULL);
 
-	vtun_syslog(LOG_INFO,"Session %s[%s:%d] opened", host->host, ip, 
+	vtun_syslog(LOG_INFO,"%s[%s:%d]: Session opened", host->host, ip, 
 					ntohs(cl_addr.sin_port) );
         host->rmt_fd = sock; 
 	
@@ -97,7 +97,7 @@ void connection(int sock)
 	/* Start tunnel */
 	tunnel(host);
 
-	vtun_syslog(LOG_INFO,"Session %s closed", host->host);
+	vtun_syslog(LOG_INFO,"%s: Session closed", host->host);
 
 	/* Unlock host. (locked in auth_server) */	
 	unlock_host(host);

@@ -125,7 +125,7 @@ void client(struct vtun_host *host)
 
 	io_init();
 
-	set_title("%s connecting to %s", host->host, vtun.svr_name);
+	set_title("%s: connecting to %s", host->host, vtun.svr_name);
         vtun_syslog(LOG_INFO,"Connecting to %s", vtun.svr_name);
 
         if( connect_t(s,(struct sockaddr *) &svr_addr, host->timeout) ){
@@ -133,14 +133,14 @@ void client(struct vtun_host *host)
 					strerror(errno), errno);
         } else {
 	   if( auth_client(s, host) ){   
-	      vtun_syslog(LOG_INFO,"Session %s[%s] opened",host->host,vtun.svr_name);
+	      vtun_syslog(LOG_INFO,"%s[%s]: Session opened",host->host,vtun.svr_name);
 
  	      host->rmt_fd = s;
 
 	      /* Start the tunnel */
 	      client_term = tunnel(host);
 
-	      vtun_syslog(LOG_INFO,"Session %s[%s] closed",host->host,vtun.svr_name);
+	      vtun_syslog(LOG_INFO,"%s[%s]: Session closed",host->host,vtun.svr_name);
 	   } else {
 	      vtun_syslog(LOG_INFO,"Connection denied by %s",vtun.svr_name);
 	   }
@@ -149,6 +149,6 @@ void client(struct vtun_host *host)
 	free_sopt(&host->sopt);
      }
 
-     vtun_syslog(LOG_INFO, "Exit");
+     vtun_syslog(LOG_INFO, "%s: Exit", host->host);
      return;
 }
