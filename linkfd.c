@@ -376,6 +376,8 @@ void *lfd_linker(void *pv)
 	      if( ++idle > lfd_host->ka_failure ){
 	         vtun_syslog(LOG_INFO,"Session %s network timeout", lfd_host->host);
 		 break;	
+	      } else {
+	         vtun_syslog(LOG_INFO,"%s session alive %d", lfd_host->host, idle);
 	      }
 	      /* Send ECHO request */
 	      if( proto_write(fd1, buf, echo_req) < 0 )
@@ -423,7 +425,12 @@ void *lfd_linker(void *pv)
 		 	continue;
 	      	}
    	      	if( fl==VTUN_ECHO_REP ){
-			/* Just ignore ECHO reply */
+			if (!t0) {
+	  			*((unsigned short *)buf) = htons(VTUN_ECHO_REQ);
+	  			write(pt->p[3], buf, sizeof(short));	//call t2 to reset idle
+			} else {
+				/* Just ignore ECHO reply */
+			}
 		 	continue;
 	      	}
 	      	if( (fl==VTUN_CONN_CLOSE)||(fl==VTUN_CONN_CLOSE0) ){
@@ -657,18 +664,22 @@ void *lfd_linker(void *pv)
 	/* t2 thread get t1 call, may be: echo_rep/exit
  	   */
 	if( (!t0) && t2 && FD_ISSET(pt->p[2], &fdset) ){
-	   	idle = 0;
 		if (read(pt->p[2], buf, sizeof(short)) > 0) {
 			flag = ntohs(*((unsigned short *)buf));
 
-			if ((flag == VTUN_ECHO_REP)) {
-				//write(fd1, buf, sizeof(short));
+			switch (flag) {
+			  case VTUN_ECHO_REQ:
+	   			idle = 0;
+				break;
+			  case VTUN_ECHO_REP:
 				proto_write(fd1, buf, flag);
        				//vtun_syslog(LOG_INFO,"%s: t2 send echo_rep to peer", lfd_host->host);
-			} else if (flag == VTUN_T_EXIT){
+				break;
+			  }
+
+			  if (flag==VTUN_T_EXIT) {
 				/* t1 call me to exit or got kill signal */
 				t1_exit_call = 1;
-
 				/* when killing process, can not proto_write() because io_cancel(),
  		   	   	   we need to write flag directly */
      				//proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
