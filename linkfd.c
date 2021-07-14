@@ -376,8 +376,6 @@ void *lfd_linker(void *pv)
 	      if( ++idle > lfd_host->ka_failure ){
 	         vtun_syslog(LOG_INFO,"Session %s network timeout", lfd_host->host);
 		 break;	
-	      } else {
-	         vtun_syslog(LOG_INFO,"%s session alive %d", lfd_host->host, idle);
 	      }
 	      /* Send ECHO request */
 	      if( proto_write(fd1, buf, echo_req) < 0 )
@@ -511,7 +509,6 @@ void *lfd_linker(void *pv)
 	/* Read data from the local device(fd2), encode and pass it to 
          * the network (fd1) */
 	if( t2 && FD_ISSET(fd2, &fdset) && lfd_check_down() ){
-	   idle = 0; 
 	   if( (len = dev_read(fd2, buf, VTUN_FRAME_SIZE)) < 0 ){
 	   	if( errno != EAGAIN && errno != EINTR )
 	       		break;
@@ -648,7 +645,6 @@ void *lfd_linker(void *pv)
 	/* t1 thread get t2 call, may be: exit
  	   */
 	if( (!t0) && t1 && FD_ISSET(pt->p[0], &fdset) ){
-	   	idle = 0;
 		if (read(pt->p[0], buf, sizeof(short)) > 0) {
 			flag = ntohs(*((unsigned short *)buf));
 
@@ -673,7 +669,6 @@ void *lfd_linker(void *pv)
 				break;
 			  case VTUN_ECHO_REP:
 				proto_write(fd1, buf, flag);
-       				//vtun_syslog(LOG_INFO,"%s: t2 send echo_rep to peer", lfd_host->host);
 				break;
 			  }
 
