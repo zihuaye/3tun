@@ -504,7 +504,6 @@ void *lfd_linker(void *pv)
 	/* Read data from the local device(fd2), encode and pass it to 
          * the network (fd1) */
 	if( t2 && FD_ISSET(fd2, &fdset) && lfd_check_down() ){
-	   idle = 0; 
 	   if( (len = dev_read(fd2, buf, VTUN_FRAME_SIZE)) < 0 ){
 	   	if( errno != EAGAIN && errno != EINTR )
 	       		break;
@@ -660,6 +659,8 @@ void *lfd_linker(void *pv)
 			flag = ntohs(*((unsigned short *)buf));
 
 			if ((flag == VTUN_ECHO_REP)) {
+	   			idle = 0; //keep-alive
+
 				//write(fd1, buf, sizeof(short));
 				proto_write(fd1, buf, flag);
 			} else if (flag == VTUN_T_EXIT){
