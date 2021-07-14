@@ -54,29 +54,30 @@
 /* used by lfd_encrypt */
 int send_a_packet = 0;
 
+/* merge mode params */
+int tv_us = 0;
 int merge_2 = 1;
 int merge_3 = 0;
 
+/* tunnel format params */
 int legacy_tunnel = 1;
 int force_legacy = 0;
 
-int tv_us = 0;
-
+/* threading params */
 int threading_mode = 0;
-int peer_close = 0;
-
-struct thread_args {
-	int rl;
-	int *p;
-};
-
 int t_pipe[4];
 enum{
-  t1_read  = 0, //read end for proto
-  t2_write = 1, //write end for dev 
-  t2_read  = 2, //read end for dev 
-  t1_write = 3  //write end for proto
+  t1_read  	= 0, //read end for proto
+  t2_write2_t1 	= 1, //write end for dev 
+  t2_read  	= 2, //read end for dev 
+  t1_write2_t2 	= 3  //write end for proto
 };
+struct thread_args {
+  int rl;
+  int *p;
+};
+
+static volatile int peer_close = 0;
 
 /* Host we are working with. 
  * Used by signal handlers that's why it is global. 
@@ -131,7 +132,7 @@ int lfd_free_mod(void)
 
  /* Run modules down (from head to tail) */
 #if defined(__mips__)
-int lfd_run_down(int len, char *in, char **out)
+static inline int lfd_run_down(int len, char *in, char **out)
 #else
 inline int lfd_run_down(int len, char *in, char **out)
 #endif
@@ -149,7 +150,7 @@ inline int lfd_run_down(int len, char *in, char **out)
 
 /* Run modules up (from tail to head) */
 #if defined(__mips__)
-int lfd_run_up(int len, char *in, char **out)
+static inline int lfd_run_up(int len, char *in, char **out)
 #else
 inline int lfd_run_up(int len, char *in, char **out)
 #endif
@@ -167,7 +168,7 @@ inline int lfd_run_up(int len, char *in, char **out)
 
 /* Check if modules are accepting the data(down) */
 #if defined(__mips__)
-int lfd_check_down(void)
+static inline int lfd_check_down(void)
 #else
 inline int lfd_check_down(void)
 #endif
@@ -183,7 +184,7 @@ inline int lfd_check_down(void)
 
 /* Check if modules are accepting the data(up) */
 #if defined(__mips__)
-int lfd_check_up(void)
+static inline int lfd_check_up(void)
 #else
 inline int lfd_check_up(void)
 #endif
@@ -248,48 +249,61 @@ static void sig_usr1(int sig)
      lfd_host->stat.comp_in = lfd_host->stat.comp_out = 0; 
 }
 
-int lfd_linker(struct thread_args *pt)
+void *lfd_linker(void *pv)
 {
      int fd1 = lfd_host->rmt_fd;
      int fd2 = lfd_host->loc_fd; 
-     register int len, fl, len0, len2, len3;
+     register int len, fl;
      struct timeval tv, tv2;
-     char *buf, *out, *pb, *pb2, *pb3;
+     char *buf, *out;
      fd_set fdset, fdset2;
-     int maxfd, idle = 0, tmplen, p, log_merge = 1, log_tunnel = 1;
+     int maxfd, idle = 0, tmplen;
+
+     struct thread_args *pt;
+     char *pb, *pb2, *pb3;
+     int len0, len2, len3, p, log_merge = 1, log_tunnel = 1;
+     int t0 = 1, t1 = 1, t2 = 1, t1_exit_call = 0, t2_exit_call = 0;
      unsigned short *pi, mask, echo_req, flag;
-     int t0=1, t1=1, t2=1, t1_exit_call=0, t2_exit_call=0;
+
+     pt = (struct thread_args *)pv;
 
      if (pt != NULL) {
      	/* threading init */
-	t0 = 0;
 
-	if (pt->rl == 1) {
-		//remote proto thread
-		t2 = 0;
-	} else if (pt->rl == 2) {
-		//local dev thread
-		t1 = 0;
+	/* t1: remote proto(tcp/udp) thread, forward remote to local */
+	/* t2: local dev(tun/tap) thread, forward local to remote */
+
+	/* pt->rl: remote(1) local(2) thread. pt->p: pipe of threads communication.
+	   pt->p[0]:t1_read pt->p[1]:t2_write2_t1 pt->p[2]:t2_read pt->p[3]:t1_write2_t2 */
+
+	t0 = 0;
+	switch (pt->rl) {
+	  case 1:
+		t2 = 0; //t1: remote proto thread
+		break;
+	  case 2:
+		t1 = 0; //t2: local dev thread
+		break;
 	}
+
+	//vtun_syslog(LOG_INFO,"%s: threading init t0:%d t1:%d t2:%d", lfd_host->host, t0, t1, t2);
      }
 
      if( !(buf = lfd_alloc((VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD)*2)) ){
 	vtun_syslog(LOG_ERR,"Can't allocate buffer for the linker"); 
-        return 0; 
+        return NULL;
      }
 
-     tv_us = 0;
-
-     /* reset tunnel mode */
+     /* reset tunnel params */
      legacy_tunnel = 1;
      mask = VTUN_FSIZE_MASK0;
-
-     echo_req = (force_legacy ? VTUN_ECHO_REQ : VTUN_ECHO_REQ2);
+     tv_us = 0;
 
      /* VTUN_ECHO_REQ2: identify self as a new format tunnel,
  	legacy tunnel will just recognize it as VTUN_ECHO_REQ */
-     if (t1)
-	/* t1==1: remote proto thread */
+     echo_req = (force_legacy ? VTUN_ECHO_REQ : VTUN_ECHO_REQ2);
+
+     if (t2)
      	proto_write(fd1, buf, echo_req);
 
      if (t0)
@@ -300,37 +314,36 @@ int lfd_linker(struct thread_args *pt)
      while( !linker_term ){
 	errno = 0;
 
-        /* Wait for data */
+	/* reset fdsets to select */
         FD_ZERO(&fdset);
 	if (t0) {
 		FD_SET(fd1, &fdset);
 		FD_SET(fd2, &fdset);
-	} else {
-		if (t1) {
-			//select remote fd1 and t1_read
-			FD_SET(fd1, &fdset);
-			FD_SET(pt->p[0], &fdset);
-     			maxfd = (fd1 > pt->p[0] ? fd1 : pt->p[0]) + 1;
-		}
-		if (t2) {
-			//select local dev fd2 and t2_read
-			FD_SET(fd2, &fdset);
-			FD_SET(pt->p[2], &fdset);
-     			maxfd = (fd2 > pt->p[2] ? fd2 : pt->p[2]) + 1;
-		}
+	} else if (t1) {
+		//select remote fd1 and t1_read
+		FD_SET(fd1, &fdset);
+		FD_SET(pt->p[0], &fdset);
+     		maxfd = (fd1 > pt->p[0] ? fd1 : pt->p[0]) + 1;
+	} else if (t2) {
+		//select local dev fd2 and t2_read
+		FD_SET(fd2, &fdset);
+		FD_SET(pt->p[2], &fdset);
+     		maxfd = (fd2 > pt->p[2] ? fd2 : pt->p[2]) + 1;
 	}
 
+	/* reset timer */
  	tv.tv_sec  = lfd_host->ka_interval;
 	tv.tv_usec = 0;
 
+        /* wait for data */
 	if( (len = select(maxfd, &fdset, NULL, NULL, &tv)) < 0 ){
 	   if( errno != EAGAIN && errno != EINTR )
 	      break;
 	   else
 	      continue;
 	} 
-	if (send_a_packet&&t2)
-        {
+
+	if (t2&&send_a_packet) {
            send_a_packet = 0;
            tmplen = 1;
 	   lfd_host->stat.byte_out += tmplen; 
@@ -340,7 +353,8 @@ int lfd_linker(struct thread_args *pt)
 	      break;
 	   lfd_host->stat.comp_out += tmplen; 
         }
-	if( (!len)&&t1 ){
+
+	if (t2&&(!len)) {
 	   /* We are idle, lets check connection */
 	   if( lfd_host->flags & VTUN_KEEP_ALIVE ){
 	      if( ++idle > lfd_host->ka_failure ){
@@ -398,7 +412,7 @@ int lfd_linker(struct thread_args *pt)
 	      	}
 	      	if( (fl==VTUN_CONN_CLOSE)||(fl==VTUN_CONN_CLOSE0) ){
 			peer_close = 1;
-	         	vtun_syslog(LOG_INFO,"%s: connection closed by other side", lfd_host->host);
+	         	vtun_syslog(LOG_INFO,"%s: connection closed by peer", lfd_host->host);
 		 	break;
 	      	}
 	   }   
@@ -607,36 +621,42 @@ int lfd_linker(struct thread_args *pt)
 
 	}
 
-
+	/* t1 thread get t2 call, may be: exit
+ 	   */
 	if( (!t0) && t1 && FD_ISSET(pt->p[0], &fdset) ){
 		if (read(pt->p[0], buf, sizeof(short)) > 0) {
 			flag = ntohs(*((unsigned short *)buf));
 
 			if (flag == VTUN_T_EXIT) {
-				/* t2 call me to exit */
+				/* t2 call me to exit or got kill signal */
 				t2_exit_call = 1;
 				break;
 			}
 		}
+		continue;
 	}
 
+	/* t2 thread get t1 call, may be: echo_rep/exit
+ 	   */
 	if( (!t0) && t2 && FD_ISSET(pt->p[2], &fdset) ){
 		if (read(pt->p[2], buf, sizeof(short)) > 0) {
 			flag = ntohs(*((unsigned short *)buf));
 
-			/* when killing process, can not proto_write() because io_cancel(),
- 		   	   we need to write flag directly */
-
 			if ((flag == VTUN_ECHO_REP)) {
-				write(fd1, buf, sizeof(short));
-				continue;
+				//write(fd1, buf, sizeof(short));
+				proto_write(fd1, buf, flag);
 			} else if (flag == VTUN_T_EXIT){
-				/* t1 call me to exit */
+				/* t1 call me to exit or got kill signal */
 				t1_exit_call = 1;
 
+				/* when killing process, can not proto_write() because io_cancel(),
+ 		   	   	   we need to write flag directly */
+     				//proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+
 				if (!peer_close) {
-					/* before exit thread, inform peer about close */
-					*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+					/* before exit, inform peer about close */
+					*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 :
+										 VTUN_CONN_CLOSE));
 					write(fd1, buf, sizeof(short));
        					vtun_syslog(LOG_INFO,"%s: t2 notify peer to close", lfd_host->host);
 				}
@@ -644,8 +664,8 @@ int lfd_linker(struct thread_args *pt)
 			}
 		}
 	}
-
      }
+
      if( !linker_term && errno )
 	vtun_syslog(LOG_INFO,"%s (%d)", strerror(errno), errno);
 
@@ -653,31 +673,31 @@ int lfd_linker(struct thread_args *pt)
        lfd_host->persist = 0;
      }
 
-     if (t1&&t0&&(!peer_close)) {
+     if (t0&&(!peer_close)) {
 	/* non-thread mode, notify other end about our close */
-     	//proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
 	*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
 	write(fd1, buf, sizeof(short));
-       	vtun_syslog(LOG_INFO,"%s: notify peer to close", lfd_host->host);
+       	vtun_syslog(LOG_INFO,"%s: t0 notify peer to close", lfd_host->host);
      }
 
-     if (t1&&(!t0)&&(!t2_exit_call)&&(!linker_term)) {
-	  *((unsigned short *)buf) = htons(VTUN_T_EXIT);
-	  write(pt->p[3], buf, sizeof(short));	//call t2 to exit
-     }
-
-     if (t2&&(!t0)&&(!t1_exit_call)&&(!linker_term)) {
+     if ((!t0)&&(!linker_term)) {
+	/* thread mode, exit on error */
 	*((unsigned short *)buf) = htons(VTUN_T_EXIT);
-	write(pt->p[1], buf, sizeof(short));	//call t1 to exit
+
+     	if (t1&&(!t2_exit_call))
+		write(pt->p[3], buf, sizeof(short));	//call t2 to exit
+
+     	if (t2&&(!t1_exit_call))
+		write(pt->p[1], buf, sizeof(short));	//call t1 to exit
      }
 
      lfd_free(buf);
 
-     return 0;
+     return NULL;
 }
 
 #if defined(__mips__)
-int send_n(int fd, char *in, char *out, int n)
+static inline int send_n(int fd, char *in, char *out, int n)
 #else
 inline int send_n(int fd, char *in, char *out, int n)
 #endif
