@@ -249,6 +249,22 @@ static void sig_usr1(int sig)
      lfd_host->stat.comp_in = lfd_host->stat.comp_out = 0; 
 }
 
+#if defined(__mips__)
+static inline int send_n(int fd, char *in, char *out, int n)
+#else
+inline int send_n(int fd, char *in, char *out, int n)
+#endif
+{
+     int len = 0;
+
+     lfd_host->stat.byte_out += n; 
+     if ((len = lfd_run_down(n, in, &out)) > 0)
+     	if ((len = proto_write(fd, out, len)) > 0)
+     		lfd_host->stat.comp_out += len;
+
+     return len;
+}
+
 void *lfd_linker(void *pv)
 {
      int fd1 = lfd_host->rmt_fd;
@@ -694,22 +710,6 @@ void *lfd_linker(void *pv)
      lfd_free(buf);
 
      return NULL;
-}
-
-#if defined(__mips__)
-static inline int send_n(int fd, char *in, char *out, int n)
-#else
-inline int send_n(int fd, char *in, char *out, int n)
-#endif
-{
-     int len = 0;
-
-     lfd_host->stat.byte_out += n; 
-     if ((len = lfd_run_down(n, in, &out)) > 0)
-     	if ((len = proto_write(fd, out, len)) > 0)
-     		lfd_host->stat.comp_out += len;
-
-     return len;
 }
 
 /* Link remote and local file descriptors */ 
