@@ -657,7 +657,7 @@ void *lfd_linker(void *pv)
 		continue;
 	}
 
-	/* t2 thread get t1 call, may be: echo_rep/exit
+	/* t2 thread get t1 call, may be: echo_req/echo_rep/exit
  	   */
 	if( (!t0) && t2 && FD_ISSET(pt->p[2], &fdset) ){
 		if (read(pt->p[2], buf, sizeof(short)) > 0) {
@@ -665,9 +665,13 @@ void *lfd_linker(void *pv)
 
 			switch (flag) {
 			  case VTUN_ECHO_REQ:
+				/* actually got an echo_rep from peer,
+ 				   need to reset t2's idle counter */
 	   			idle = 0;
 				break;
 			  case VTUN_ECHO_REP:
+				/* actually I got an echo_req from peer,
+ 				   t1 call me to send echo_rep*/
 				proto_write(fd1, buf, flag);
 				break;
 			  }
@@ -675,15 +679,17 @@ void *lfd_linker(void *pv)
 			  if (flag==VTUN_T_EXIT) {
 				/* t1 call me to exit or got kill signal */
 				t1_exit_call = 1;
-				/* when killing process, can not proto_write() because io_cancel(),
- 		   	   	   we need to write flag directly */
-     				//proto_write(fd1, buf, (legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
 
 				if (!peer_close) {
 					/* before exit, inform peer about close */
+
 					*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 :
 										 VTUN_CONN_CLOSE));
+
+					/* when killing process, can not proto_write() because io_cancel(),
+ 		   	   	   	   we need to write flag directly */
 					write(fd1, buf, sizeof(short));
+
        					vtun_syslog(LOG_INFO,"%s: t2 notify peer to close", lfd_host->host);
 				}
 				break;
@@ -702,6 +708,7 @@ void *lfd_linker(void *pv)
      if (t0&&(!peer_close)) {
 	/* non-thread mode, notify other end about our close */
 	*((unsigned short *)buf) = htons((legacy_tunnel ? VTUN_CONN_CLOSE0 : VTUN_CONN_CLOSE));
+
 	write(fd1, buf, sizeof(short));
        	vtun_syslog(LOG_INFO,"%s: t0 notify peer to close", lfd_host->host);
      }
@@ -712,7 +719,6 @@ void *lfd_linker(void *pv)
 
      	if (t1&&(!t2_exit_call))
 		write(pt->p[3], buf, sizeof(short));	//call t2 to exit
-
      	if (t2&&(!t1_exit_call))
 		write(pt->p[1], buf, sizeof(short));	//call t1 to exit
      }
