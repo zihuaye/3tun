@@ -641,6 +641,7 @@ void *lfd_linker(void *pv)
 	/* t1 thread get t2 call, may be: exit
  	   */
 	if( (!t0) && t1 && FD_ISSET(pt->p[0], &fdset) ){
+	   	idle = 0;
 		if (read(pt->p[0], buf, sizeof(short)) > 0) {
 			flag = ntohs(*((unsigned short *)buf));
 
@@ -656,14 +657,14 @@ void *lfd_linker(void *pv)
 	/* t2 thread get t1 call, may be: echo_rep/exit
  	   */
 	if( (!t0) && t2 && FD_ISSET(pt->p[2], &fdset) ){
+	   	idle = 0;
 		if (read(pt->p[2], buf, sizeof(short)) > 0) {
 			flag = ntohs(*((unsigned short *)buf));
 
 			if ((flag == VTUN_ECHO_REP)) {
-	   			idle = 0; //keep-alive
-
 				//write(fd1, buf, sizeof(short));
 				proto_write(fd1, buf, flag);
+       				//vtun_syslog(LOG_INFO,"%s: t2 send echo_rep to peer", lfd_host->host);
 			} else if (flag == VTUN_T_EXIT){
 				/* t1 call me to exit or got kill signal */
 				t1_exit_call = 1;
