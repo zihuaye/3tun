@@ -53,7 +53,7 @@
 static volatile sig_atomic_t server_term;
 static void sig_term(int sig)
 {
-     vtun_syslog(LOG_INFO,"Terminated");
+     vtun_syslog(LOG_INFO,"Server terminated");
      server_term = VTUN_SIG_TERM;
 }
 
