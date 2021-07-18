@@ -63,6 +63,8 @@ int merge_3 = 0;
 int legacy_tunnel = 1;
 int force_legacy = 0;
 
+unsigned short mask = VTUN_FSIZE_MASK0;
+
 /* threading params */
 int threading_mode = 0;
 int t_pipe[4];
@@ -279,7 +281,7 @@ void *lfd_linker(void *pv)
      char *pb, *pb2, *pb3;
      int len0, len2, len3, p, log_merge = 1, log_tunnel = 1;
      int t0 = 1, t1 = 1, t2 = 1, t1_exit_call = 0, t2_exit_call = 0;
-     unsigned short *pi, mask, echo_req, flag;
+     unsigned short *pi, echo_req, flag;
 
      pt = (struct thread_args *)pv;
 
@@ -311,9 +313,9 @@ void *lfd_linker(void *pv)
      }
 
      /* reset tunnel params */
+     tv_us = 0;
      legacy_tunnel = 1;
      mask = VTUN_FSIZE_MASK0;
-     tv_us = 0;
 
      /* VTUN_ECHO_REQ2: identify self as a new format tunnel,
  	legacy tunnel will just recognize it as VTUN_ECHO_REQ */

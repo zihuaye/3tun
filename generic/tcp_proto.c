@@ -56,16 +56,16 @@
 #include "lib.h"
 
 extern int legacy_tunnel;
+extern unsigned short mask;
 
 int tcp_write(int fd, char *buf, int len)
 {
      register char *ptr;
-     unsigned short mask, plen;
+     unsigned short plen;
 
      ptr = buf - sizeof(short);			//first 2 bytes is frame size
      *((unsigned short *)ptr) = htons(len); 	//converts host byte order to network byte order
 
-     mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
      plen = (len >= VTUN_ECHO_REQ ? sizeof(short) : (len & mask) + sizeof(short));
 
      return write_n(fd, ptr, plen);
@@ -73,7 +73,7 @@ int tcp_write(int fd, char *buf, int len)
 
 int tcp_read(int fd, char *buf)
 {
-     unsigned short len, flen, mask;
+     unsigned short len, flen;
      register int rlen;
 
      /* Read frame size */
@@ -82,7 +82,6 @@ int tcp_read(int fd, char *buf)
 
      len = ntohs(len);		//converts network byte order to host byte order
 
-     mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
      flen = (len >= VTUN_ECHO_REQ ? 0 : len & mask);
 
      if( flen > VTUN_FRAME_SIZE + VTUN_FRAME_OVERHEAD ){
