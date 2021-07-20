@@ -57,6 +57,7 @@ extern int merge_2;
 extern int merge_3;
 
 extern int force_legacy;
+extern int threading_mode;
 
 int main(int argc, char *argv[], char *env[])
 {
@@ -97,7 +98,7 @@ int main(int argc, char *argv[], char *env[])
      /* Start logging to syslog and stderr */
      openlog("vtund", LOG_PID | LOG_NDELAY | LOG_PERROR, LOG_DAEMON);
 
-     while( (opt=getopt(argc,argv,"abcdlmisf:P:L:t:npvh")) != EOF ){
+     while( (opt=getopt(argc,argv,"abcdlmisf:P:L:t:npvhT")) != EOF ){
 	switch(opt){
 	    case 'a':
 		merge_2 = 0;
@@ -146,6 +147,9 @@ int main(int argc, char *argv[], char *env[])
 		break;
 	    case 't':
 	        vtun.timeout = atoi(optarg);	
+	        break;
+	    case 'T':
+	        threading_mode = 1;
 	        break;
 	    case 'v':
      		printf("VTun ver %s\n", VTUN_VER);
@@ -274,5 +278,5 @@ void usage(void)
      /* I don't think these work. I'm disabling the suggestion - bish 20050601*/
      printf("\tvtund [-f file] " /* [-P port] [-L local address] */
 	    "[-p] [-m] [-t timeout] <host profile> <server address>\n");
-     printf("  Extra options:\n\t-a(1pkt mode) -b(3pkt mode) -c(tcp_cork) -d(tcp_nodelay) -l(force_legacy)\n");
+     printf("  Extra options:\n\t-a(1pkt mode) -b(3pkt mode) -c(tcp_cork) -d(tcp_nodelay) -l(force_legacy) -T(threading_mode)\n");
 }

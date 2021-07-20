@@ -57,18 +57,18 @@
 #include "lib.h"
 
 extern int legacy_tunnel;
+extern unsigned short mask;
 
 /* Functions to read/write UDP frames. */
 int udp_write(int fd, char *buf, int len)
 {
      register char *ptr;
      register int wlen;
-     unsigned short mask, plen;
+     unsigned short plen;
 
      ptr = buf - sizeof(short);
      *((unsigned short *)ptr) = htons(len); 
 
-     mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
      plen = (len >= VTUN_ECHO_REQ ? sizeof(short) : (len & mask) + sizeof(short));
 
      while( 1 ){
@@ -87,7 +87,7 @@ int udp_write(int fd, char *buf, int len)
 
 int udp_read(int fd, char *buf)
 {
-     unsigned short hdr, flen, mask;
+     unsigned short hdr, flen;
      struct iovec iv[2];
      register int rlen;
 
@@ -107,7 +107,6 @@ int udp_read(int fd, char *buf)
 
         hdr = ntohs(hdr);
 
-     	mask = (legacy_tunnel ? VTUN_FSIZE_MASK0 : VTUN_FSIZE_MASK);
      	flen = (hdr >= VTUN_ECHO_REQ ? 0 : hdr & mask);
 
         if( rlen < 2 || (rlen-2) != flen )
