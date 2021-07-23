@@ -19,7 +19,7 @@
 #  
 CC = @CC@
 CFLAGS = @CFLAGS@ @CPPFLAGS@
-LDFLAGS = @LIBS@
+LDFLAGS = @LIBS@ -lpthread
 
 YACC = @YACC@
 YACCFLAGS = -d
